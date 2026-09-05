@@ -1,0 +1,18 @@
+# ESP-IDF build output and downloaded managed components
+/build/
+/managed_components/
+
+# Machine-local configuration; reproducible defaults stay versioned
+/sdkconfig
+/sdkconfig.old
+
+# Codex workspace metadata
+/.agents/
+/.codex/
+
+# Editor and OS files
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
