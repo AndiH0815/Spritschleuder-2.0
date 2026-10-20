@@ -16,3 +16,15 @@
 *.swp
 *~
 .DS_Store
+
+# Private credentials, certificates and local exports
+/private-setup/
+*.pem
+*.key
+*-nvs.bin
+/tests/build/
+/dist/
+/build-*/
+
+__pycache__/
+*.pyc

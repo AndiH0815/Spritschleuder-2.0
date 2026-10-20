@@ -1,0 +1,8 @@
+menu "Spritschleuder"
+config SPRIT_HARDWARE_CONFIRMED
+    bool "Pumpenausgabe nach Hardwarepruefung freigeben"
+    default n
+    help
+        Erst nach Abgleich von Arduino-Board, Pins, aktiven Pegeln, Treibern
+        und Stromversorgung aktivieren. Entwicklungsbuilds bewegen keine Pumpen.
+endmenu

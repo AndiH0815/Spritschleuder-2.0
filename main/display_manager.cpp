@@ -119,7 +119,7 @@ void DisplayManager::render() {
     }
     else if (current == State::Info) {
         text(49, 6, "INFO", BLACK);
-        std::string ip = WifiManager::getInstance().ipAddress(), url = "http://" + ip;
+        std::string ip = WifiManager::getInstance().ipAddress(), url = "https://" + ip;
         struct QrContext { DisplayManager *display; } context{this};
         esp_qrcode_config_t cfg = ESP_QRCODE_CONFIG_DEFAULT();
         cfg.max_qrcode_version = 3; cfg.qrcode_ecc_level = ESP_QRCODE_ECC_LOW; cfg.user_data = &context;
@@ -138,7 +138,7 @@ void DisplayManager::render() {
         char amount[16]; snprintf(amount, sizeof(amount), "%d ML", ml); text(4, 57, amount, ORANGE);
         rectangle(4, 81, 120, 22, DARK); rectangle(7, 84, percent * 114 / 100, 16, ORANGE);
         char progress[8]; snprintf(progress, sizeof(progress), "%d", percent); text(48, 108, progress, WHITE); text(69, 108, "PCT", WHITE);
-        if (elapsed >= duration) { std::lock_guard<std::mutex> lock(state_mutex); state = State::Ready; }
+        // Only the acknowledged controller completion may release the display.
     }
     flush();
 }
@@ -151,16 +151,9 @@ void DisplayManager::showReady() { std::lock_guard<std::mutex> lock(state_mutex)
 void DisplayManager::showAborted() { std::lock_guard<std::mutex> lock(state_mutex); state = State::Aborted; detail.clear(); state_until_us = esp_timer_get_time() + 3000000; }
 void DisplayManager::showMainMenu() { showReady(); }
 void DisplayManager::showError(const std::string &error) { std::lock_guard<std::mutex> lock(state_mutex); state = State::Error; detail = error; }
-void DisplayManager::showMixing(const Recipe &recipe, int ml) {
-    uint32_t duration = 0, total_ml = 0;
-    for (uint8_t i = 0; i < recipe.num_ingredients; ++i) total_ml += recipe.ingredients[i].amount_ml;
-    for (uint8_t i = 0; i < recipe.num_ingredients; ++i) {
-        uint32_t ingredient_ml = recipe.ingredients[i].amount_ml * ml / total_ml;
-        duration = std::max(duration, std::min<uint32_t>(ingredient_ml * 450U, 65535U));
-    }
+void DisplayManager::showMixing(const Recipe &recipe, int ml, uint32_t duration) {
     std::lock_guard<std::mutex> lock(state_mutex); state = State::Mixing; detail = recipe.name; quantity_ml = ml;
     mixing_started_us = esp_timer_get_time(); mixing_duration_ms = duration;
-    ESP_LOGI(TAG, "Mische %s (%d ml, %lu ms)", recipe.name.c_str(), ml, static_cast<unsigned long>(mixing_duration_ms));
 }
 void DisplayManager::showInfo() { std::lock_guard<std::mutex> lock(state_mutex); state = State::Info; }
 void DisplayManager::toggleInfo() { std::lock_guard<std::mutex> lock(state_mutex); state = state == State::Info ? State::Ready : State::Info; }

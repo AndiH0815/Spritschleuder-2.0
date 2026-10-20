@@ -2,10 +2,7 @@
 
 #include "driver/uart.h"
 
-#define HTTP_PORT 80
-#define AP_SSID "Spritschleuder-Setup"
-#define AP_PASSWORD "cocktail"
-#define WIFI_MAXIMUM_RETRY 8
+#define HTTP_PORT 443
 
 // Arduino Kommunikation
 #define UART_PORT_NUM   UART_NUM_1
