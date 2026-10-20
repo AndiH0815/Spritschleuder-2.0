@@ -35,7 +35,7 @@
 <section class="panel"><h3>Überwachung</h3><label class="check"><input id="scaleEnabled" type="checkbox" disabled>Waagenüberwachung aktiv</label><p class="muted">Vorbereitet ist die Bedienung ohne Waage. Für Glasentnahme und fehlenden Gewichtszuwachs müssen Sensor und Anschlüsse zuerst feststehen.</p><p class="subtle">Derzeit wird kein Glas erkannt. Die Zeitdosierung benötigt eine Kalibrierung je Pumpe.</p><h3 style="margin-top:24px">Verbindung &amp; Ausgabe</h3><p id="diagnostics" class="subtle"></p><p class="muted">Der Stopp oben erreicht immer alle acht Ausgänge. Nach einer Unterbrechung startet kein Drink automatisch erneut.</p></section></div>
 <section class="panel"><h3>WLAN &amp; Einrichtung</h3>
 <p id="wifiStatus" class="muted" role="status"></p><p id="wifiMessage" class="subtle"></p>
-<p class="subtle">Ohne bekanntes WLAN startet nach etwa einer Minute der geschützte Hotspot <strong>spritschleuder</strong>. Alternativ die Info-Taste am Gerät fünf Sekunden halten. Tablet mit diesem WLAN verbinden und <strong>https://192.168.4.1</strong> öffnen. Die Anmeldung bleibt erforderlich.</p>
+<p class="subtle">Ohne bekanntes WLAN startet nach etwa einer Minute der geschützte Hotspot <strong>spritschleuder</strong>. Alternativ die Info-Taste am Gerät fünf Sekunden halten. Tablet mit diesem WLAN verbinden und <strong>https://spritschleuder.local</strong> öffnen. Falls der Gerätename auf diesem Gerät nicht funktioniert: <strong>https://192.168.4.1</strong>. Die Anmeldung bleibt erforderlich.</p>
 <form id="wifiForm"><div class="row"><label>WLAN-Name<input id="wifiSsid" maxlength="32" autocomplete="off" required></label><label>WLAN-Passwort<input id="wifiPassword" type="password" maxlength="64" autocomplete="new-password"></label></div>
 <label class="check"><input id="wifiOpen" type="checkbox">Dieses WLAN hat kein Passwort</label>
 <p class="subtle muted">Die Verbindung wird bis zu einer Minute getestet. Erst bei Erfolg werden die neuen Daten gespeichert; bei einem Fehler bleiben die bisherigen erhalten. Während der Einrichtung sind Pumpenstarts gesperrt. Die Browserverbindung kann beim Wechsel kurz abbrechen.</p>
@@ -200,7 +200,7 @@ function renderWifi(data){
   $('wifiSave').disabled=!!data.testing;$('wifiStart').disabled=!!data.setup;
   $('wifiFinish').disabled=!data.setup||!data.connected||!!data.testing;
   var valid=data.connected&&/^\d{1,3}(\.\d{1,3}){3}$/.test(data.ip);
-  $('wifiLink').hidden=!valid;if(valid)$('wifiLink').href='https://'+data.ip;
+  $('wifiLink').hidden=!valid;if(valid)$('wifiLink').href=data.local_name_available?'https://spritschleuder.local':'https://'+data.ip;
 }
 $('wifiSsid').oninput=function(){wifiSsidDirty=true};
 $('wifiOpen').onchange=function(){$('wifiPassword').disabled=$('wifiOpen').checked;if($('wifiOpen').checked)$('wifiPassword').value=''};

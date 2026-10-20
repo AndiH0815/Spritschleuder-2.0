@@ -15,3 +15,7 @@ tests/build/access
 
 c++ -std=c++17 -Wall -Wextra -Werror -pedantic -DSPRIT_HOST_TEST -DCONFIG_SPRIT_HARDWARE_CONFIRMED=1 -Itests/fakes tests/test_wifi.cpp main/wifi_manager.cpp main/arduino_comm.cpp -o tests/build/wifi
 tests/build/wifi
+
+c++ -std=c++17 -Wall -Wextra -Werror -pedantic -Itests/fakes tests/test_discovery.cpp main/local_discovery.cpp -o tests/build/discovery
+tests/build/discovery
+python tests/test_certificate.py

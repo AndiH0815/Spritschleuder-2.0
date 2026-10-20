@@ -9,7 +9,7 @@ let pumps=Array.from({length:8},(_,i)=>({active:i<4,ingredient:i+1,ml_per_second
 let configuration={ingredients:[{id:1,name:'Zutat 1'},{id:4,name:'Limette'}],glasses:[{name:'Klein',ml:200},{name:'Groß',ml:400}]};
 let recipes=[{id:1,name:'Cuba Libre',manual:'Cola',photo:'',review:false,available:true,portions:[{ingredient:1,ml:40,strength:true},{ingredient:4,ml:20,strength:false}]}];
 let nextId=2;
-let network={connected:true,configured:true,setup:false,testing:false,ssid:'Home',saved_ssid:'Home',ip:'192.168.1.50',message:''},lastWifi=null;
+let network={connected:true,configured:true,setup:false,testing:false,local_name_available:true,local_url:'https://spritschleuder.local',ssid:'Home',saved_ssid:'Home',ip:'192.168.1.50',message:''},lastWifi=null;
 // Exercise the real firmware policy rather than a less restrictive test page.
 const policySource=fs.readFileSync('main/cocktail_server.cpp','utf8').split('"Content-Security-Policy",')[1].split(');')[0];
 const policy=Array.from(policySource.matchAll(/"([^"]*)"/g),m=>m[1]).join('');
@@ -113,7 +113,9 @@ const server=http.createServer(async(req,res)=>{
     assert(await page.locator('#wifiSave').isEnabled());
     network={...network,ssid:'New home',saved_ssid:'New home',ip:'192.168.1.60',setup:false,message:'Mit WLAN verbunden'};
     await page.getByText('Mit WLAN verbunden',{exact:true}).waitFor();assert(await page.locator('#test').isEnabled());
-    assert.equal(await page.locator('#wifiLink').getAttribute('href'),'https://192.168.1.60');
+    assert.equal(await page.locator('#wifiLink').getAttribute('href'),'https://spritschleuder.local');
+    network={...network,local_name_available:false};
+    await page.waitForFunction(()=>document.getElementById('wifiLink').getAttribute('href')==='https://192.168.1.60');
     for(const width of [1024,736,360,320]){await page.setViewportSize({width,height:1000});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'WiFi form overflow '+width)}
     // Expired elevated access hides administration without exposing its forms.
     admin=false;await page.locator('#adminLogin').waitFor();assert(await page.locator('#tech').isHidden());

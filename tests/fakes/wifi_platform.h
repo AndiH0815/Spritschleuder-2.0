@@ -23,10 +23,12 @@ inline wifi_config_t fake_sta, fake_ap;
 inline int fake_mode=WIFI_MODE_STA, fake_switches=0, fake_attempts=0;
 inline bool fake_associated=false, fake_started=false;
 inline int fake_wifi_error=0;
+inline std::string fake_hostname;
 inline int esp_netif_init(){return 0;}
 inline int esp_event_loop_create_default(){return 0;}
 inline void* esp_netif_create_default_wifi_sta(){return reinterpret_cast<void*>(1);}
 inline void* esp_netif_create_default_wifi_ap(){return reinterpret_cast<void*>(2);}
+inline int esp_netif_set_hostname(void*,const char*name){fake_hostname=name;return 0;}
 inline void* esp_netif_get_handle_from_ifkey(const char*){return reinterpret_cast<void*>(1);}
 inline uint32_t esp_ip4addr_aton(const char*s){return inet_addr(s);}
 inline void esp_ip4addr_ntoa(const esp_ip4_addr_t*a,char*out,size_t n){inet_ntop(AF_INET,&a->addr,out,n);}

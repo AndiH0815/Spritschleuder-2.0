@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include "recipes.h"
 #include "wifi_manager.h"
+#include "local_discovery.h"
 #include <cmath>
 #include <cstring>
 #include <memory>
@@ -118,6 +119,8 @@ cJSON *wifiJson() {
     cJSON_AddStringToObject(o, "saved_ssid", s.saved_ssid.c_str());
     cJSON_AddStringToObject(o, "ip", s.ip.c_str());
     cJSON_AddStringToObject(o, "message", s.message.c_str());
+    cJSON_AddBoolToObject(o, "local_name_available", LocalDiscovery::running());
+    cJSON_AddStringToObject(o, "local_url", LocalDiscovery::Url);
     return o;
 }
 bool newRequest(cJSON *root, WebSession &s) {
@@ -283,10 +286,13 @@ esp_err_t CocktailServer::start() {
             return e;
         }
     }
+    if (LocalDiscovery::start() != ESP_OK)
+        ESP_LOGW("web", "Lokaler Geraetename nicht verfuegbar; Zugang ueber IP bleibt moeglich");
     return ESP_OK;
 }
 void CocktailServer::stop() {
     if (server) {
+        LocalDiscovery::stop();
         httpd_ssl_stop(server);
         server = nullptr;
     }

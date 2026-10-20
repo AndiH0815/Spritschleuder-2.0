@@ -2,6 +2,7 @@
 #include "config.h"
 #include "recipes.h"
 #include "wifi_manager.h"
+#include "local_discovery.h"
 #include "qrcode.h"
 #include "driver/gpio.h"
 #include "esp_heap_caps.h"
@@ -130,7 +131,8 @@ void DisplayManager::render() {
     }
     else if (current == State::Info) {
         text(49, 6, "INFO", BLACK);
-        std::string ip = WifiManager::getInstance().ipAddress(), url = "https://" + ip;
+        std::string ip = WifiManager::getInstance().ipAddress();
+        std::string url = LocalDiscovery::running() ? LocalDiscovery::Url : "https://" + ip;
         struct QrContext { DisplayManager *display; } context{this};
         esp_qrcode_config_t cfg = ESP_QRCODE_CONFIG_DEFAULT();
         cfg.max_qrcode_version = 3; cfg.qrcode_ecc_level = ESP_QRCODE_ECC_LOW; cfg.user_data = &context;

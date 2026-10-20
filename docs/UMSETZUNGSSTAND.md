@@ -56,3 +56,11 @@ Dies ist eine Softwareprüfung mit abschließend erforderlichem Hardwareabgleich
 - Neue WLAN-Daten erst testen, dann als ein Profil speichern. Fehlversuch behält bisheriges WLAN und Setup-Zugang. Übergangszeit vor automatischem AP-Abschalten: 15 Sekunden.
 - Hosttests prüfen die echte WifiManager-Klasse mit simuliertem Treiber/NVS: Timer, WPA2-Konfiguration, Profile/Altdaten, Zeitüberschreitung, Speicherfehler, Neustart, offene Netze, manuellen/automatischen Modus und Warten auf Stopp. Die echte Steuerung prüft zusätzlich die zentrale Startsperre und verlorene Stopprückmeldung. Entprellung, kurzer/langer Druck und Zählerüberlauf sind geprüft.
 - Browserprüfung ergänzt um geschütztes WLAN-Menü, Passwortleerung, Testfehler, Link zur neuen IP, Startsperre und schmale Ansichten. Reale Funk-, DHCP-, TLS-, Flash-/Stromausfall- und Tabletprüfung folgt in Nettetal. Das initiale Zertifikat muss für die Setup-IP gültig und auf dem Tablet vertrauenswürdig sein; der USB-Generator berücksichtigt dies jetzt.
+
+## Ergänzung: feste lokale Geräteadresse
+
+- `https://spritschleuder.local` per offizieller mDNS-Komponente auf STA und AP, HTTPS-Dienst erst nach gestartetem Server; DHCP-Hostname `spritschleuder`.
+- Der Zugriff ist mit verschiedenen Browsergeräten vorgesehen, jeweils mit Anmeldung. Eine zusätzliche Bestellung bleibt während der Ausgabe zentral gesperrt. Das ursprüngliche feste Tablet ist keine Gerätebindung.
+- IP-Ersatzweg und Setup-IP bleiben erhalten. Menüverknüpfung und Info-QR verwenden bei aktivem Namensdienst den lokalen Namen.
+- Neue Ersteinrichtungszertifikate berücksichtigen Gerätenamen und beide IP-Adressen. Bestehende Zertifikate/NVS werden durch diesen Code weder umgeschrieben noch gelöscht.
+- Hosttests prüfen Diensttyp/Port, fehlende vertrauliche TXT-Daten, Lebenszyklus und Fehlerbereinigung; OpenSSL prüft die tatsächlich erzeugten Zertifikate auf DNS-Namen, beide IP-Adressen, Deduplizierung und passenden Schlüssel. Browserprüfung prüft Namenslink und IP-Rückfall. Reale Namensauflösung auf iPhone/iPad, PC und vorhandenem Android-Tablet sowie nach Netzwechsel folgt am Gerät.

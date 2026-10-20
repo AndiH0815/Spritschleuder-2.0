@@ -1,6 +1,7 @@
 #include "wifi_manager.h"
 #include "arduino_comm.h"
 #include "nvs.h"
+#include "local_discovery.h"
 #ifndef SPRIT_HOST_TEST
 #include "esp_event.h"
 #include "esp_log.h"
@@ -53,7 +54,8 @@ esp_err_t WifiManager::init() {
     if (!configured) { ssid.clear(); password.clear(); }
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
+    auto sta_netif = esp_netif_create_default_wifi_sta();
+    ESP_ERROR_CHECK(esp_netif_set_hostname(sta_netif, LocalDiscovery::Hostname));
     auto ap = esp_netif_create_default_wifi_ap();
     esp_netif_ip_info_t ap_ip = {};
     ap_ip.ip.addr = esp_ip4addr_aton("192.168.4.1");

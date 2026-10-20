@@ -23,6 +23,7 @@ struct WifiTest {
         assert(WifiManager::validCredentials(std::string(32,'s'),std::string(64,'a')));
         reset();oldProfile();
         WifiManager w;w.init();assert(w.status().configured);
+        assert(fake_hostname=="spritschleuder");
         connect(w);at(w,1);at(w,120000);assert(!w.status().setup); // no Internet check
         fake_associated=false;w.got_ip=false;at(w,120001);at(w,180000);assert(!w.status().setup);
         at(w,180001);assert(w.status().setup&&fake_mode==WIFI_MODE_APSTA);
