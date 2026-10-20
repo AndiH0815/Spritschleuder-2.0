@@ -1,0 +1,28 @@
+name: Firmware and control checks
+on:
+  push:
+    branches: [feature/eight-pump-controller]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: sprit-checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    container: espressif/idf:v6.0.2
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: ESP32-C3 firmware
+        shell: bash
+        run: |
+          . /opt/esp/idf/export.sh
+          idf.py -B build-ci -DIDF_TARGET=esp32c3 build
+      - name: Host control, storage and access checks
+        shell: bash
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends g++ libssl-dev
+          CJSON_SOURCE="$PWD/managed_components/espressif__cjson/cJSON" sh tools/test.sh
