@@ -18,9 +18,18 @@ Erste Firmware-Erweiterung auf Basis von `68d6eafb3ad59853c75596843d3263a1e18437
 - [x] ESP32-C3-Build mit ESP-IDF 6.0.2; rund 940 KiB in bestehender 1-MiB-Anwendungspartition
 - [x] Browserprüfung mit Mock-API: Login, Verwaltungsfreigabe, acht Plätze, Kalibrierung, Bestellsperre, Verbindung und bestätigter Stopp; 1024/736/360/320 Pixel ohne horizontales Überlaufen
 
+## Ergänzung: drei Bedienbereiche
+
+- Gastansicht mit Fotokarten, explizitem Start, zwei gespeicherten Glasgrößen und Stärke.
+- Bestellsperre und Fortschritt richten sich nach der echten Steuerungsantwort; Wartungsläufe erzeugen keine Meldung über einen fertigen Cocktail.
+- Barkeeper verwaltet benannte Zutaten, acht Rezeptzeilen und Glasprofile. Rezeptmengen beziehen sich auf 400 ml fertigen Drink.
+- Fotos lassen sich auswählen, zuschneiden und als kleines JPEG lokal speichern. Der Bildbereich liegt zusätzlich hinter der bestehenden App-Partition; Flashgröße und freie Bereiche vor Ort prüfen.
+- Maintenance bietet acht feste Plätze mit Aktivierung, Zuordnung, Kalibrierung sowie begrenzten Läufen zum Vorfüllen und Spülen.
+- Beide Verwaltungsansichten benötigen die zusätzliche, zeitlich begrenzte Freigabe. Gäste erhalten keine Pumpeneinstellungen.
+- Automatische GitHub-Prüfungen für ESP32-C3, reale Speicher-/Steuerungsklassen und Browserabläufe ergänzt. Der aktuelle Prüflauf ist in PR #1 sichtbar.
+
 ## Für die vollständige geplante Version noch nötig
 
-- Foto-Oberfläche und lokaler Bildspeicher, Zutatenbezeichnungen und veränderbare Glasprofile an die echte API anschließen.
 - Vereinbarten Waagensensor und Pins festlegen, Sensoradapter und Prüfung vor dem Aktivieren ergänzen; derzeit ist die Überwachung aus.
 - Konfiguration exportieren/importieren; Passwortänderung und vollständigen Sitzungswiderruf ergänzen.
 - Bestehende WLAN-/Zugangsdaten über einen Wartungsweg erhalten und ändern können. Der USB-Helfer erzeugt bislang ein erstes NVS-Abbild, kein verlustfreies Update eines bestehenden Geräts.
@@ -38,4 +47,4 @@ Erste Firmware-Erweiterung auf Basis von `68d6eafb3ad59853c75596843d3263a1e18437
 7. Ohne Login jede API direkt aufrufen; ohne Verwaltungsfreigabe Pumpentest/Einstellungen versuchen. Beide Zugriffe müssen scheitern.
 8. Internet zum Router trennen, lokales WLAN erhalten: Bedienung bleibt erreichbar. Router ausschalten: Pumpen stoppen und kein Hotspot erscheint.
 
-Dies ist eine Softwareprüfung mit abschließend erforderlichem Hardwareabgleich. Fotos, geplante Waage und finale Bediengestaltung sind durch den ersten Steuerungsstand noch nicht vollständig abgedeckt.
+Dies ist eine Softwareprüfung mit abschließend erforderlichem Hardwareabgleich. Der Bildspeicher und die neue Oberfläche benötigen zusätzlich die Prüfung auf dem tatsächlichen ESP32 und dem alten Android-Tablet. Die Waagenüberwachung bleibt bis zur Auswahl und Implementierung des Sensoradapters ausgeschaltet.

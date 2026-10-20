@@ -40,14 +40,14 @@ const server=http.createServer(async(req,res)=>{
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
   const browser=await chromium.launch({executablePath:process.env.SPRIT_CHROMIUM,args:['--no-sandbox','--disable-dev-shm-usage'],headless:true});
   try{
-    const page=await browser.newPage({viewport:{width:1024,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+    const page=await browser.newPage({viewport:{width:1024,height:1000}}),errors=[];page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));
     await page.goto('http://127.0.0.1:'+server.address().port+'/');
     await page.locator('#password').fill('wrong');await page.locator('#loginForm button').click();await page.getByText('Falsches Passwort',{exact:true}).waitFor();
     await page.locator('#password').fill('test-access');await page.locator('#loginForm button').click();await page.locator('#cards button').waitFor();
     await page.locator('#size').selectOption('200');await page.locator('#strength').selectOption('0.5');await page.locator('#cards button').click();
     assert((await page.locator('#selectedAmounts').textContent()).includes('20 ml aus der Maschine'));
     assert((await page.locator('#selectedAmounts').textContent()).includes('180 ml Cola'));
-    await page.locator('[data-view=bar]').click();await page.locator('#adminPassword').fill('test-admin');await page.locator('#adminForm button').click();await page.locator('#recipeForm').waitFor();
+    await page.locator('[data-view=bar]').click();await page.locator('#adminPassword').fill('test-admin');await page.getByRole('button',{name:'Freigeben',exact:true}).click();await page.locator('#recipeForm').waitFor();
     assert.equal(await page.locator('.part').count(),8);
     await page.locator('#recipeName').fill('Party Libre');await page.locator('#manual').fill('Cola');
     await page.locator('#partIngredient0').selectOption('1');await page.locator('#partMl0').fill('40');await page.locator('#partStrength0').check();
