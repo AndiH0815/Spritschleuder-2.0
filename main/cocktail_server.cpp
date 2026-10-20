@@ -19,8 +19,8 @@
 #include <cmath>
 #include <cstring>
 #include <memory>
-extern const uint8_t page_start[] asm("_binary_web_html_start");
-extern const uint8_t page_end[] asm("_binary_web_html_end");
+extern const uint8_t page_start[] asm("_binary_web_html_gz_start");
+extern const uint8_t page_end[] asm("_binary_web_html_gz_end");
 namespace {
 uint32_t boot_id = 0;
 using Json = std::unique_ptr<cJSON, decltype(&cJSON_Delete)>;
@@ -279,6 +279,7 @@ esp_err_t CocktailServer::pageHandler(httpd_req_t *r) {
     // Public shell contains only the login form and client code, no recipes or
     // secrets.
     httpd_resp_set_type(r, "text/html; charset=utf-8");
+    httpd_resp_set_hdr(r, "Content-Encoding", "gzip");
     httpd_resp_set_hdr(r, "Cache-Control", "no-store");
     httpd_resp_set_hdr(r, "X-Frame-Options", "DENY");
     httpd_resp_set_hdr(r, "Content-Security-Policy",

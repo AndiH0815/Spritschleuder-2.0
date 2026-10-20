@@ -1,6 +1,8 @@
 // Tests the actual browser UI with a mock API, not ESP32 hardware or TLS.
 const { chromium } = require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES ? process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES + '/playwright' : 'playwright');
 const fs = require('fs'),http = require('http'),assert = require('assert');
+require('child_process').execFileSync('python3',['tools/embed_web.py','main/web.html','tests/build/web.html.gz']);
+const compressedPage=fs.readFileSync('tests/build/web.html.gz');
 let logged=false,admin=false,orders=0,heartbeats=0,uploaded=null,lastOrder=null;
 let status={boot_id:7,state:'idle',error:'',online:true,busy:false,job:0,outputs:0,elapsed_ms:0,duration_ms:10000,manual_ml:340,admin:false,sequence:0,hardware_enabled:true,photos_ready:true};
 let pumps=Array.from({length:8},(_,i)=>({active:i<4,ingredient:i+1,ml_per_second:2}));
@@ -13,7 +15,7 @@ const policy=Array.from(policySource.matchAll(/"([^"]*)"/g),m=>m[1]).join('');
 
 const server=http.createServer(async(req,res)=>{
   const path=new URL(req.url,'http://localhost').pathname;
-  if(path==='/'){res.setHeader('Content-Type','text/html');res.setHeader('Content-Security-Policy',policy);return res.end(fs.readFileSync('main/web.html'))}
+  if(path==='/'){res.setHeader('Content-Type','text/html');res.setHeader('Content-Security-Policy',policy);res.setHeader('Content-Encoding','gzip');return res.end(compressedPage)}
   const chunks=[];for await(const chunk of req)chunks.push(chunk);const raw=Buffer.concat(chunks);
   const data=req.headers['content-type']==='application/json'?JSON.parse(raw.toString()):{};
   const reply=(obj,code=200)=>{res.writeHead(code,{'Content-Type':'application/json'});res.end(JSON.stringify(obj))};
