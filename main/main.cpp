@@ -14,6 +14,9 @@
 #include "wifi_manager.h"
 #include "button_manager.h"
 #include "recipes.h"
+#include "pump_settings.h"
+#include "bar_settings.h"
+#include "photo_store.h"
 
 static const char *TAG = "cocktailbot_main";
 
@@ -24,11 +27,16 @@ extern "C" void app_main(void)
     // NVS initialisieren
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
+        // Never destroy recipes/credentials to recover automatically.
+        ESP_LOGE(TAG, "NVS muss gesichert und manuell repariert werden");
+        return;
     }
     ESP_ERROR_CHECK(ret);
     ESP_ERROR_CHECK(RecipeStore::getInstance().init());
+    ESP_ERROR_CHECK(PumpSettings::getInstance().init());
+    ESP_ERROR_CHECK(BarSettings::getInstance().init());
+    if (PhotoStore::getInstance().init() != ESP_OK)
+        ESP_LOGW(TAG, "Bildspeicher nicht verfuegbar; vorhandene Daten bleiben erhalten");
     
     // Display initialisieren
     DisplayManager::getInstance().init();
@@ -41,7 +49,7 @@ extern "C" void app_main(void)
     ButtonManager::getInstance().init();
     
     // HTTP/WebSocket Server starten
-    CocktailServer::getInstance().start();
+    ESP_ERROR_CHECK(CocktailServer::getInstance().start());
     DisplayManager::getInstance().showReady();
     
     ESP_LOGI(TAG, "CocktailBot bereit!");

@@ -1,51 +1,39 @@
-// Arduino Sketch für Pumpensteuerung
+// Build this separate target with tools/build_arduino.sh after verifying the
+// board.
+#include "../shared/pump_board.h"
 #include <Arduino.h>
-
-#define MAX_PUMPS 8
-
-const int pumpPins[MAX_PUMPS] = {2, 3, 4, 5, 6, 7, 8, 9};
-unsigned long pumpStops[MAX_PUMPS] = {};
-
-void setup() {
-    Serial.begin(115200);
-    
-    for (int i = 0; i < MAX_PUMPS; i++) {
-        pinMode(pumpPins[i], OUTPUT);
-        digitalWrite(pumpPins[i], LOW);
-    }
+const uint8_t pumpPins[sprit::PumpCount] = {2, 3, 4, 5, 6, 7, 8, 9};
+sprit::PumpBoard board;
+sprit::Parser parser;
+static void outputs() {
+    for (size_t i = 0; i < sprit::PumpCount; ++i)
+        digitalWrite(pumpPins[i], board.mask() & (1U << i) ? HIGH : LOW);
 }
-
-void loop() {
-    while (Serial.available() >= 5) {
-        // Protokoll: 0xAA [PUMP_ID] [DURATION_HI] [DURATION_LO] 0x55
-        if (Serial.read() == 0xAA) {
-            uint8_t pumpId = Serial.read();
-            uint8_t durationHi = Serial.read();
-            uint8_t durationLo = Serial.read();
-            uint8_t endByte = Serial.read();
-            
-            if (endByte == 0x55 && pumpId < MAX_PUMPS) {
-                uint16_t duration = (durationHi << 8) | durationLo;
-                
-                if (duration == 0) {
-                    digitalWrite(pumpPins[pumpId], LOW);
-                    pumpStops[pumpId] = 0;
-                } else {
-                    digitalWrite(pumpPins[pumpId], HIGH);
-                    pumpStops[pumpId] = millis() + duration;
-                }
-                
-                // Bestätigung senden
-                Serial.write(0xBB);
-                Serial.write(pumpId);
-                Serial.write(0x55);
-            }
-        }
+static void send(const sprit::Frame &f) {
+    auto bytes = sprit::encode(f);
+    Serial.write(bytes.data(), bytes.size());
+}
+void setup() {
+    for (size_t i = 0; i < sprit::PumpCount; ++i) {
+        digitalWrite(pumpPins[i], LOW);
+        pinMode(pumpPins[i], OUTPUT);
     }
-    const unsigned long now = millis();
-    for (int pump = 0; pump < MAX_PUMPS; ++pump) {
-        if (pumpStops[pump] && static_cast<long>(now - pumpStops[pump]) >= 0) {
-            digitalWrite(pumpPins[pump], LOW); pumpStops[pump] = 0;
+    Serial.begin(115200);
+    sprit::Frame boot;
+    boot.type = sprit::Message::Boot;
+    send(boot);
+}
+void loop() {
+    sprit::Frame f;
+    // Bound RX work so noise or continuous serial traffic cannot starve timers.
+    for (unsigned n = 0; n < 64 && Serial.available(); ++n)
+        if (parser.feed(uint8_t(Serial.read()), millis(), f)) {
+            auto response = board.handle(f, millis());
+            outputs();
+            send(response);
         }
+    if (board.tick(millis(), f)) {
+        outputs();
+        send(f);
     }
 }

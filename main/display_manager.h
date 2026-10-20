@@ -14,7 +14,7 @@ public:
     void init();
     void showBootScreen();
     void showMainMenu();
-    void showMixing(const Recipe& recipe, int quantity_ml);
+    void showMixing(const Recipe& recipe, int quantity_ml, uint32_t duration_ms);
     void showReady();
     void showAborted();
     void showInfo();

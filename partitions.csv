@@ -1,0 +1,7 @@
+# Existing NVS, PHY and factory application addresses stay unchanged.
+# Photos require at least 4 MiB flash; verify installed module before flashing.
+# Name, Type, SubType, Offset, Size
+nvs, data, nvs, 0x9000, 0x6000
+phy_init, data, phy, 0xf000, 0x1000
+factory, app, factory, 0x10000, 0x100000
+photos, data, spiffs, 0x110000, 0x2f0000

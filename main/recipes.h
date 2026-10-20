@@ -1,30 +1,29 @@
 #pragma once
-
+#include "../shared/dosing.h"
+#include "esp_err.h"
 #include <array>
-#include <cstddef>
-#include <cstdint>
 #include <mutex>
 #include <string>
 #include <vector>
-#include "esp_err.h"
-
 struct Recipe {
-    std::string name;
-    struct Ingredient { uint8_t pump_id; uint16_t amount_ml; };
-    std::array<Ingredient, 4> ingredients{};
-    uint8_t num_ingredients = 0;
+    uint32_t id = 0;
+    std::string name, manual_name = "Manuell auffuellen";
+    std::string photo_key;
+    sprit::DosingRecipe dosing;
+    bool needs_review = false;
 };
-
 class RecipeStore {
-public:
+  public:
     static RecipeStore &getInstance();
     esp_err_t init();
     std::vector<Recipe> all() const;
-    bool get(size_t index, Recipe &recipe) const;
-    esp_err_t add(const Recipe &recipe);
-private:
-    RecipeStore() = default;
+    bool get(uint32_t id, Recipe &) const;
+    esp_err_t put(Recipe &);
+    esp_err_t remove(uint32_t id);
+
+  private:
     esp_err_t save();
     mutable std::mutex mutex;
     std::vector<Recipe> recipes;
+    uint32_t next_id = 1;
 };

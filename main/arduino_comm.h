@@ -1,34 +1,49 @@
 #pragma once
-
-#include <vector>
-#include <queue>
-#include <mutex>
-#include <atomic>
+#include "../shared/dosing.h"
+#ifdef SPRIT_HOST_TEST
+#include "../tests/fakes/platform.h"
+#else
+#include "driver/uart.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/uart.h"
-#include "cocktail_server.h"
+#endif
+#include <mutex>
+#include <string>
 
-struct ArduinoCommand {
-    uint8_t pump_id;
-    uint16_t duration_ms;
+struct ControllerStatus {
+    std::string state = "offline", error;
+    bool online = false, busy = false;
+    uint32_t job = 0, elapsed_ms = 0, duration_ms = 0;
+    uint8_t outputs = 0;
+    double manual_ml = 0;
 };
-
 class ArduinoComm {
-public:
-    static ArduinoComm& getInstance();
-    
+  public:
+    static ArduinoComm &getInstance();
     void init();
-    void sendOrder(const CocktailOrder& order);
+    bool start(const sprit::Plan &, const std::string &owner, std::string &error);
+    void heartbeat(const std::string &owner, uint32_t job);
     void abort();
-    
-private:
+    bool setNetworkSetup(bool enabled, bool stopActive = false);
+    ControllerStatus status();
+    bool busy();
+
+  private:
+    friend struct ControllerTest;
     ArduinoComm() = default;
-    
-    static void uart_task(void *param);
-    std::queue<ArduinoCommand> command_queue;
-    std::mutex queue_mutex;
-    std::mutex uart_mutex;
-    std::atomic<uint32_t> abort_generation{0};
-    TaskHandle_t uart_task_handle = nullptr;
+    void poll(uint32_t now);
+    static void uart_task(void *);
+    void send(sprit::Message type);
+    void stopLocked();
+    void receive(const sprit::Frame &, uint32_t now);
+    std::mutex mutex;
+    ControllerStatus current;
+    sprit::Plan plan;
+    sprit::Parser parser;
+    std::string owner;
+    uint32_t session = 0, next_job = 0, started = 0, last_rx = 0, last_tx = 0, owner_seen = 0,
+             stopping_at = 0;
+    bool ready = false, stopping = false;
+    bool network_setup = false;
+    TaskHandle_t task_handle = nullptr;
 };
