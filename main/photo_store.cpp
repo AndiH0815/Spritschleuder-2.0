@@ -3,7 +3,8 @@
 #include "esp_partition.h"
 #include "esp_random.h"
 #include "esp_spiffs.h"
-#include <array>
+#include <memory>
+#include <new>
 #include <cstdio>
 #include <cstring>
 #include <dirent.h>
@@ -42,11 +43,14 @@ esp_err_t PhotoStore::init() {
         auto part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
                                              ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "photos");
         if (!part || e != ESP_FAIL) return e;
-        std::array<unsigned char, 4096> bytes;
-        for (size_t offset = 0; offset < part->size; offset += bytes.size()) {
+        // app_main has a small stack; keep the flash scan buffer on the heap.
+        constexpr size_t chunk = 4096;
+        std::unique_ptr<unsigned char[]> bytes(new (std::nothrow) unsigned char[chunk]);
+        if (!bytes) return ESP_ERR_NO_MEM;
+        for (size_t offset = 0; offset < part->size; offset += chunk) {
             size_t count = part->size - offset;
-            if (count > bytes.size()) count = bytes.size();
-            e = esp_partition_read(part, offset, bytes.data(), count);
+            if (count > chunk) count = chunk;
+            e = esp_partition_read(part, offset, bytes.get(), count);
             if (e != ESP_OK) return e;
             for (size_t j = 0; j < count; ++j)
                 if (bytes[j] != 0xff) return ESP_ERR_INVALID_STATE;
