@@ -9,6 +9,7 @@ let pumps=Array.from({length:8},(_,i)=>({active:i<4,ingredient:i+1,ml_per_second
 let configuration={ingredients:[{id:1,name:'Zutat 1'},{id:4,name:'Limette'}],glasses:[{name:'Klein',ml:200},{name:'Groß',ml:400}]};
 let recipes=[{id:1,name:'Cuba Libre',manual:'Cola',photo:'',review:false,available:true,portions:[{ingredient:1,ml:40,strength:true},{ingredient:4,ml:20,strength:false}]}];
 let nextId=2;
+let network={connected:true,configured:true,setup:false,testing:false,ssid:'Home',saved_ssid:'Home',ip:'192.168.1.50',message:''},lastWifi=null;
 // Exercise the real firmware policy rather than a less restrictive test page.
 const policySource=fs.readFileSync('main/cocktail_server.cpp','utf8').split('"Content-Security-Policy",')[1].split(');')[0];
 const policy=Array.from(policySource.matchAll(/"([^"]*)"/g),m=>m[1]).join('');
@@ -21,7 +22,7 @@ const server=http.createServer(async(req,res)=>{
   const reply=(obj,code=200)=>{res.writeHead(code,{'Content-Type':'application/json'});res.end(JSON.stringify(obj))};
   if(path==='/api/login'){if(data.password!=='test-access')return reply({error:'Falsches Passwort'},401);logged=true;return reply(status)}
   if(!logged)return reply({error:'Bitte anmelden'},401);
-  if(path==='/api/status')return reply({...status,admin});
+  if(path==='/api/status')return reply({...status,admin,wifi_setup:network.setup,wifi:admin?network:undefined});
   if(path==='/api/admin'){admin=data.password==='test-admin';return reply({...status,admin},admin?200:403)}
   if(path==='/api/heartbeat'){heartbeats++;return reply({...status,admin})}
   if(path==='/api/abort'){status={...status,state:'stopping',busy:true};return reply({...status,admin})}
@@ -35,6 +36,15 @@ const server=http.createServer(async(req,res)=>{
     status={...status,state:'running',busy:true,elapsed_ms:0,outputs:1,job:status.job+1,sequence:data.sequence,duration_ms:data.duration_ms||10000};return reply({...status,admin})
   }
   if(!admin)return reply({error:'Verwaltung erforderlich'},403);
+  if(path==='/api/wifi'||path==='/api/wifi/start'||path==='/api/wifi/finish'){
+    if(status.busy)return reply({error:'Ausgabe aktiv'},409);
+    if(req.method==='POST'){
+      if(path==='/api/wifi'){lastWifi=data;network={...network,setup:true,testing:true,message:'WLAN-Test läuft'}}
+      if(path==='/api/wifi/start')network={...network,setup:true};
+      if(path==='/api/wifi/finish')network={...network,setup:false};
+    }
+    return reply(network);
+  }
   if(path==='/api/pumps'){if(req.method==='POST')pumps=data.pumps;return reply(req.method==='POST'?{}:pumps)}
   if(path==='/api/recipes'){let r={...data,id:data.id||nextId++,available:true,review:false,photo:''};const old=recipes.find(x=>x.id===r.id);if(old){r.photo=old.photo;recipes=recipes.map(x=>x.id===r.id?r:x)}else recipes.push(r);return reply(r)}
   if(path==='/api/recipe/delete'){recipes=recipes.filter(r=>r.id!==data.id);return reply({})}
@@ -89,8 +99,24 @@ const server=http.createServer(async(req,res)=>{
         assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Overflow '+width+' '+target);
       }
     }
+    // WLAN setup remains in the protected Maintenance view and locks starts.
+    await page.locator('[data-view=tech]').click();await page.locator('#wifiSsid').waitFor();
+    assert.equal(await page.locator('#wifiSsid').inputValue(),'Home');
+    await page.locator('#wifiSsid').fill('New home');await page.locator('#wifiPassword').fill('new-password');
+    await page.locator('#wifiSave').click();await page.getByText('WLAN-Test läuft',{exact:true}).waitFor();
+    assert.deepEqual(lastWifi,{ssid:'New home',password:'new-password'});
+    assert.equal(await page.locator('#wifiPassword').inputValue(),'');
+    assert(await page.locator('#wifiSave').isDisabled()&&await page.locator('#test').isDisabled());
+    await page.locator('[data-view=guest]').click();await page.locator('[data-recipe="1"]').click();assert(await page.locator('#order').isDisabled());
+    network={...network,testing:false,message:'WLAN-Test fehlgeschlagen; bisherige Daten erhalten'};
+    await page.locator('[data-view=tech]').click();await page.getByText('WLAN-Test fehlgeschlagen; bisherige Daten erhalten',{exact:true}).waitFor();
+    assert(await page.locator('#wifiSave').isEnabled());
+    network={...network,ssid:'New home',saved_ssid:'New home',ip:'192.168.1.60',setup:false,message:'Mit WLAN verbunden'};
+    await page.getByText('Mit WLAN verbunden',{exact:true}).waitFor();assert(await page.locator('#test').isEnabled());
+    assert.equal(await page.locator('#wifiLink').getAttribute('href'),'https://192.168.1.60');
+    for(const width of [1024,736,360,320]){await page.setViewportSize({width,height:1000});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'WiFi form overflow '+width)}
     // Expired elevated access hides administration without exposing its forms.
     admin=false;await page.locator('#adminLogin').waitFor();assert(await page.locator('#tech').isHidden());
-    assert.deepEqual(errors,[]);console.log('Guest doses, three menus, recipes, stable names, glass profiles, JPEG upload, 8 slots, calibration, heartbeat, stop confirmation, maintenance completion and responsive layouts: PASS');
+    assert.deepEqual(errors,[]);console.log('Guest doses, three menus, recipes, stable names, glass profiles, JPEG upload, 8 slots, calibration, heartbeat, stop confirmation, maintenance completion, protected WiFi setup, password clearing, setup start lock and responsive layouts: PASS');
   }finally{await browser.close();server.close()}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1});

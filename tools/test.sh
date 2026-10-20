@@ -12,3 +12,6 @@ c++ -std=c++17 -Wall -Wextra -Werror -pedantic -Itests/fakes -I"$CJSON_SOURCE" t
 tests/build/storage
 c++ -std=c++17 -Wall -Wextra -Werror -pedantic -Itests/fakes tests/test_access.cpp main/access_control.cpp -lcrypto -o tests/build/access
 tests/build/access
+
+c++ -std=c++17 -Wall -Wextra -Werror -pedantic -DSPRIT_HOST_TEST -DCONFIG_SPRIT_HARDWARE_CONFIRMED=1 -Itests/fakes tests/test_wifi.cpp main/wifi_manager.cpp main/arduino_comm.cpp -o tests/build/wifi
+tests/build/wifi

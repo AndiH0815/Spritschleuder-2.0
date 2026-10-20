@@ -24,6 +24,7 @@ class ArduinoComm {
     bool start(const sprit::Plan &, const std::string &owner, std::string &error);
     void heartbeat(const std::string &owner, uint32_t job);
     void abort();
+    bool setNetworkSetup(bool enabled, bool stopActive = false);
     ControllerStatus status();
     bool busy();
 
@@ -33,6 +34,7 @@ class ArduinoComm {
     void poll(uint32_t now);
     static void uart_task(void *);
     void send(sprit::Message type);
+    void stopLocked();
     void receive(const sprit::Frame &, uint32_t now);
     std::mutex mutex;
     ControllerStatus current;
@@ -42,5 +44,6 @@ class ArduinoComm {
     uint32_t session = 0, next_job = 0, started = 0, last_rx = 0, last_tx = 0, owner_seen = 0,
              stopping_at = 0;
     bool ready = false, stopping = false;
+    bool network_setup = false;
     TaskHandle_t task_handle = nullptr;
 };

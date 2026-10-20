@@ -37,6 +37,8 @@ static const uint8_t *glyph(char c) {
     static const uint8_t colon[5] = {0,0x36,0x36,0,0}, dash[5] = {0x08,0x08,0x08,0x08,0x08};
     if (c >= '0' && c <= '9') return digits[c - '0'];
     if (c >= 'A' && c <= 'Z') return letters[c - 'A'];
+    static const uint8_t dot[5] = {0,0x60,0x60,0,0};
+    if (c == '.') return dot;
     if (c == ':') return colon;
     if (c == '-') return dash;
     return blank;
@@ -103,7 +105,16 @@ void DisplayManager::render() {
     uint16_t accent = ORANGE;
     rectangle(0, 0, DISPLAY_WIDTH, 19, accent);
     rectangle(0, 19, DISPLAY_WIDTH, 2, DARK);
-    if (current == State::Boot) {
+    auto wifi = WifiManager::getInstance().status();
+    if (wifi.setup && (current == State::Ready || current == State::Info)) {
+        text(31, 6, "WLAN SETUP", BLACK);
+        text(19, 32, "SPRITSCHLEUDER", WHITE);
+        text(13, 51, "HTTPS://", ORANGE);
+        text(19, 68, "192.168.4.1", WHITE);
+        text(7, 91, "PUMPEN GESPERRT", MUTED);
+        text(7, 110, wifi.testing ? "WLAN TEST LAEUFT" : "TABLET VERBINDEN", ORANGE);
+    }
+    else if (current == State::Boot) {
         text(49, 6, "START", WHITE);
         rectangle(7, 38, 114, 47, PANEL); text(13, 50, "SPRITSCHLEUDER", WHITE); text(34, 70, "BOOTET", MUTED);
     }

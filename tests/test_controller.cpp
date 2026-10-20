@@ -79,6 +79,23 @@ struct ControllerTest {
             exchange(esp, board);
             assert(esp.start(plan(), "tablet", e));
         }
+        // Network changes share the start mutex: setup blocks every pump path,
+        // and a physical request waits for the actual STOP acknowledgement.
+        {
+            ArduinoComm esp; sprit::PumpBoard board; setup(esp, board);
+            std::string e;
+            assert(esp.setNetworkSetup(true));
+            assert(!esp.start(plan(), "tablet", e));
+            assert(esp.setNetworkSetup(false));
+            assert(esp.start(plan(), "tablet", e)); exchange(esp, board);
+            assert(!esp.setNetworkSetup(true));
+            assert(esp.setNetworkSetup(true, true)); exchange(esp, board, true);
+            assert(!board.mask() && esp.busy());
+            advance(esp, board, 500, nullptr);
+            assert(!esp.busy() && !esp.start(plan(), "tablet", e));
+            esp.setNetworkSetup(false);
+            assert(esp.start(plan(), "tablet", e));
+        }
         // A second browser cannot keep another tablet's output alive.
         {
             ArduinoComm esp;

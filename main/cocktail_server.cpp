@@ -80,6 +80,7 @@ Json body(httpd_req_t *r) {
     }
     return Json(root, cJSON_Delete);
 }
+cJSON *wifiJson();
 cJSON *status(WebSession *s) {
     auto state = ArduinoComm::getInstance().status();
     auto o = cJSON_CreateObject();
@@ -102,6 +103,21 @@ cJSON *status(WebSession *s) {
 #endif
     cJSON_AddBoolToObject(o, "scale_enabled", false);
     cJSON_AddBoolToObject(o, "photos_ready", PhotoStore::getInstance().ready());
+    cJSON_AddBoolToObject(o, "wifi_setup", WifiManager::getInstance().status().setup);
+    if (s && s->admin_until > esp_timer_get_time()) cJSON_AddItemToObject(o, "wifi", wifiJson());
+    return o;
+}
+cJSON *wifiJson() {
+    auto s = WifiManager::getInstance().status();
+    auto o = cJSON_CreateObject();
+    cJSON_AddBoolToObject(o, "connected", s.connected);
+    cJSON_AddBoolToObject(o, "configured", s.configured);
+    cJSON_AddBoolToObject(o, "setup", s.setup);
+    cJSON_AddBoolToObject(o, "testing", s.testing);
+    cJSON_AddStringToObject(o, "ssid", s.ssid.c_str());
+    cJSON_AddStringToObject(o, "saved_ssid", s.saved_ssid.c_str());
+    cJSON_AddStringToObject(o, "ip", s.ip.c_str());
+    cJSON_AddStringToObject(o, "message", s.message.c_str());
     return o;
 }
 bool newRequest(cJSON *root, WebSession &s) {
@@ -314,6 +330,11 @@ esp_err_t CocktailServer::apiHandler(httpd_req_t *r) {
     if (!session)
         return error(r, "Bitte anmelden", "401 Unauthorized");
     if (r->method == HTTP_GET) {
+        if (uri == "/api/wifi") {
+            if (session->admin_until <= esp_timer_get_time())
+                return error(r, "Verwaltungsfreigabe erforderlich", "403 Forbidden");
+            return reply(r, wifiJson());
+        }
         if (uri == "/api/bar") return reply(r, barJson());
         uint32_t photo_id;
         if (photoId(uri, photo_id)) {
@@ -407,6 +428,21 @@ esp_err_t CocktailServer::apiHandler(httpd_req_t *r) {
         return error(r, "Verwaltungsfreigabe erforderlich", "403 Forbidden");
     if (comm.busy())
         return error(r, "Aenderungen waehrend Ausgabe gesperrt", "409 Conflict");
+    if (uri == "/api/wifi" || uri == "/api/wifi/start" || uri == "/api/wifi/finish") {
+        auto &wifi = WifiManager::getInstance();
+        std::string reason;
+        bool accepted;
+        if (uri == "/api/wifi/start") {
+            accepted = wifi.requestSetup(); reason = "Zuerst Ausgabe stoppen";
+        } else if (uri == "/api/wifi/finish") accepted = wifi.finishSetup(reason);
+        else {
+            if (!cJSON_IsString(field(root.get(), "ssid")) ||
+                !cJSON_IsString(field(root.get(), "password")))
+                return error(r, "WLAN-Name und Passwort erforderlich");
+            accepted = wifi.configure(string(root.get(), "ssid"), string(root.get(), "password"), reason);
+        }
+        return accepted ? reply(r, wifiJson()) : error(r, reason.c_str(), "409 Conflict");
+    }
     if (uri == "/api/bar") {
         auto names = field(root.get(), "ingredients"), glasses = field(root.get(), "glasses");
         if (!cJSON_IsArray(names) || cJSON_GetArraySize(names) > 32 ||

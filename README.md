@@ -17,7 +17,7 @@ Die eingebettete Browseroberfläche verbindet Gast, Barkeeper und Maintenance mi
 - Zentraler Auftragszustand, Ablehnung paralleler Bestellungen und bereits verwendeter Start-Sequenzen. Kein automatisches Wiederholen von Startbefehlen nach einem Verbindungsfehler.
 - Neues UART-Protokoll mit CRC, Sitzung, Auftragskennung, Annahme-, Status-, Fertig- und Stoppbestätigung. Ein abgelaufener Countdown bedeutet noch keinen Abschluss.
 - Verbindungsüberwachung auf ESP32 und Arduino. Verlust des aktiven Bedientablets, Kommunikationsfehler und Neustarts führen zum Stopp. Ein fremder Browser hält einen Auftrag nicht am Leben.
-- Heim-WLAN im Station-Modus, wiederholte Verbindungsversuche, kein eigener Hotspot – auch bei fehlenden Zugangsdaten.
+- Heim-WLAN mit Wiederverbindung. Nach 60 Sekunden ohne bekannte WLAN-Verbindung startet der WPA2-geschützte Einrichtungs-Hotspot `spritschleuder` (Passwort `12345678`). Fehlender Internetzugang allein löst keinen Wechsel aus.
 - HTTPS ohne HTTP-Rückfall, Bedienpasswort, zeitlich begrenzte Sitzung und zusätzliche Verwaltungsfreigabe. Serverseitige Prüfung aller geschützten Funktionen.
 - USB-Ersteinrichtung über ein lokal erzeugtes privates NVS-Abbild; keine Zugangsdaten im Quellcode. Ohne Zugangsdaten und Zertifikat bleibt der Webserver geschlossen.
 - Übernahme alter Vier-Pumpen-Rezepte mit Prüfmarkierung. Alte Mengen und der alte Speicherblock bleiben erhalten. Keine automatische Umdeutung in neue 400-ml-Rezepte und kein automatisches Löschen von NVS.
@@ -26,8 +26,16 @@ Die eingebettete Browseroberfläche verbindet Gast, Barkeeper und Maintenance mi
 
 - Anpassung an die tatsächlich verbaute Hardware, Pumpenpegel, Versorgung, Kalibrierung und reale Auslauftests.
 - Waagenmodell, Pins, Hardwareadapter und Sensorgrenzwerte. Die Wiegeüberwachung ist ausgeschaltet; dieser Stand allein erfüllt das spätere Nachrüsten ohne Firmwarewechsel noch nicht. Dafür muss der vereinbarte Sensoradapter vor der endgültigen Inbetriebnahme ergänzt werden.
-- Passwortwechsel, Widerruf aller Sitzungen, Datenexport/-import und WLAN-Wechsel mit getesteter Rückkehr zu den alten Zugangsdaten. Das Provisionierungswerkzeug ist ausschließlich für eine gesicherte **Ersteinrichtung** gedacht.
+- Passwortwechsel, Widerruf aller Sitzungen und Datenexport/-import. Das Provisionierungswerkzeug ist ausschließlich für eine gesicherte **Ersteinrichtung** gedacht.
 - Prüfung des lokalen Zertifikats und des alten Android-Browsers. „Angemeldet bleiben“ gilt bis zu 30 Tage, aber ein Neustart der Steuerung verwirft in diesem ersten Stand alle Sitzungen.
+
+## WLAN wechseln und ohne bekanntes Netz einrichten
+
+- Maintenance → **WLAN & Einrichtung** benötigt Login und zusätzliche Verwaltungsfreigabe. Ein neues WLAN wird bis zu 60 Sekunden getestet. Erst nach Verbindung mit zugewiesener IP und zwei Sekunden Stabilität wird das SSID/Passwort-Paar als einzelner NVS-Wert gespeichert. Andere Namespaces (Rezepte, Pumpen, Zugangsdaten, Fotos) bleiben erhalten. Bei Zeitüberschreitung oder Speicherfehler wird das bisherige WLAN erneut versucht; der Setup-Hotspot bleibt offen für einen weiteren Versuch.
+- Der Einrichtungs-Hotspot startet automatisch nach 60 Sekunden ohne WLAN oder über **fünf Sekunden Info-Taste/K2** (bisheriger Pin GPIO 10, vor Ort prüfen). Kurzer Druck schaltet weiterhin die Infoansicht um; Entprellung und Zeitüberlauf sind berücksichtigt. Ein langer Druck während einer Ausgabe fordert Stopp an; die Netzwerkumschaltung wartet auf die echte Stoppbestätigung.
+- Tablet mit `spritschleuder` verbinden, `https://192.168.4.1` öffnen und wie gewohnt anmelden. Das Hotspot-Passwort ersetzt weder Bedien- noch Verwaltungspasswort. Es gibt keinen unverschlüsselten HTTP-Server, keine Fernfreigabe und kein Captive Portal. Ein neues, unprovisioniertes Gerät benötigt zunächst weiterhin USB-Ersteinrichtung der Webzugangsdaten und des Zertifikats.
+- Während des gesamten Setups sind Startbefehle zentral im Pumpencontroller gesperrt (einschließlich Kalibrier-/Spülläufen). Der Hotspot bleibt bei Fehlern für neue Eingaben aktiv. Nach erfolgreichem Speichern oder automatischer Rückkehr ins bekannte WLAN schließt er mit 15 Sekunden Übergangszeit; ein manuell angeforderter Hotspot lässt sich auch über **Einrichtung beenden** schließen. Kein Direkt-Mixbetrieb über den Setup-Hotspot.
+- Die Oberfläche zeigt die neue lokale IP. Danach Tablet mit dem gewählten WLAN verbinden und diese Adresse öffnen; die Sitzung an der alten IP wird nicht automatisch an eine andere IP übertragen. Die vom ursprünglichen USB-Werkzeug erzeugten Zertifikate enthalten nur die frühere LAN-IP; neu erzeugte Zertifikate enthalten zusätzlich `192.168.4.1`. Bei einer anderen LAN-IP Zertifikat/SAN prüfen und vor Ort passend einrichten; bestehendes NVS dafür nicht mit einem neuen Ersteinrichtungsabbild überschreiben. Bei einem Heimnetz im selben Subnetz `192.168.4.0/24` müssen die parallelen STA-/AP-Routen vor Ort gesondert geprüft werden.
 
 ## ESP32 bauen
 

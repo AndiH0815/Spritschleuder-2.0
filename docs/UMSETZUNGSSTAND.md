@@ -10,7 +10,7 @@ Erste Firmware-Erweiterung auf Basis von `68d6eafb3ad59853c75596843d3263a1e18437
 - [x] Doppelte und überlappende Aufträge auf Steuerungsebene abweisen
 - [x] Tatsächlichen Abschluss und Stopp bestätigen, nicht aus Countdown ableiten
 - [x] Unterbrechung der Bedien-/UART-Verbindung und Controller-Neustart behandeln
-- [x] Heim-WLAN ohne Hotspot und ohne begrenzte Zahl von Wiederverbindungsversuchen
+- [x] Heim-WLAN mit Wiederverbindung und geschütztem Setup-Hotspot bei Ausfall oder langem Info-Tastendruck
 - [x] Allgemeiner Login, Verwaltungsfreigabe, HTTPS und serverseitige API-Prüfung
 - [x] Alte Rezepte erhalten, markieren und vor Neuinterpretation prüfen
 - [x] Hosttests für Kernlogik, beide Steuerungsteile, Speicherung und Sitzungen
@@ -32,7 +32,7 @@ Erste Firmware-Erweiterung auf Basis von `68d6eafb3ad59853c75596843d3263a1e18437
 
 - Vereinbarten Waagensensor und Pins festlegen, Sensoradapter und Prüfung vor dem Aktivieren ergänzen; derzeit ist die Überwachung aus.
 - Konfiguration exportieren/importieren; Passwortänderung und vollständigen Sitzungswiderruf ergänzen.
-- Bestehende WLAN-/Zugangsdaten über einen Wartungsweg erhalten und ändern können. Der USB-Helfer erzeugt bislang ein erstes NVS-Abbild, kein verlustfreies Update eines bestehenden Geräts.
+- Passwortänderung und verlustfreie Zertifikatswartung ergänzen. WLAN-Wechsel ist über Maintenance umgesetzt; der USB-Helfer erzeugt weiterhin ausschließlich ein erstes NVS-Abbild.
 - Mit Dieter die tatsächlichen Boards, Firmwareversionen, Ausgangspegel, Stromversorgung, Pins und verfügbaren Speicher prüfen.
 - Flash/NVS sichern, Zertifikat auf dem alten Tablet prüfen und beide Firmwares gemeinsam testen: zunächst ohne Pumpenlast, dann mit Wasser und Messgefäß, schließlich in finaler Schlauchführung.
 
@@ -45,6 +45,14 @@ Erste Firmware-Erweiterung auf Basis von `68d6eafb3ad59853c75596843d3263a1e18437
 5. Tabletverbindung und UART getrennt unterbrechen sowie beide Controller getrennt neu starten. Kein automatischer Wiederanlauf.
 6. Kalibrierwerte pro Leitung messen und speichern. Alter Vier-Pumpen-Rezeptbestand muss bis zur Prüfung unbestellbar bleiben.
 7. Ohne Login jede API direkt aufrufen; ohne Verwaltungsfreigabe Pumpentest/Einstellungen versuchen. Beide Zugriffe müssen scheitern.
-8. Internet zum Router trennen, lokales WLAN erhalten: Bedienung bleibt erreichbar. Router ausschalten: Pumpen stoppen und kein Hotspot erscheint.
+8. Internet zum Router trennen, lokales WLAN erhalten: Bedienung bleibt erreichbar. Router ausschalten: Pumpen stoppen; nach 60 Sekunden erscheint nur der geschützte Setup-Hotspot. Falsche neue Daten, Stromausfall, erfolgreichen Wechsel, lange Info-Taste während Ausgabe und verlorene Stoppbestätigung am Gerät prüfen.
 
 Dies ist eine Softwareprüfung mit abschließend erforderlichem Hardwareabgleich. Der Bildspeicher und die neue Oberfläche benötigen zusätzlich die Prüfung auf dem tatsächlichen ESP32 und dem alten Android-Tablet. Die Waagenüberwachung bleibt bis zur Auswahl und Implementierung des Sensoradapters ausgeschaltet.
+
+## Ergänzung: WLAN-Setup und Wiederherstellung
+
+- SSID genau `spritschleuder`, WPA2-Passwort wie vom Eigentümer festgelegt `12345678`; HTTPS und bestehende Berechtigungen bleiben erforderlich.
+- 60 Sekunden WLAN-Ausfall, fünf Sekunden Info-Taste oder Maintenance starten das Setup. Kein Internettest. Netzwechsel nach bestätigtem Pumpenstopp, zentrale Startsperre für alle Ausgaben.
+- Neue WLAN-Daten erst testen, dann als ein Profil speichern. Fehlversuch behält bisheriges WLAN und Setup-Zugang. Übergangszeit vor automatischem AP-Abschalten: 15 Sekunden.
+- Hosttests prüfen die echte WifiManager-Klasse mit simuliertem Treiber/NVS: Timer, WPA2-Konfiguration, Profile/Altdaten, Zeitüberschreitung, Speicherfehler, Neustart, offene Netze, manuellen/automatischen Modus und Warten auf Stopp. Die echte Steuerung prüft zusätzlich die zentrale Startsperre und verlorene Stopprückmeldung. Entprellung, kurzer/langer Druck und Zählerüberlauf sind geprüft.
+- Browserprüfung ergänzt um geschütztes WLAN-Menü, Passwortleerung, Testfehler, Link zur neuen IP, Startsperre und schmale Ansichten. Reale Funk-, DHCP-, TLS-, Flash-/Stromausfall- und Tabletprüfung folgt in Nettetal. Das initiale Zertifikat muss für die Setup-IP gültig und auf dem Tablet vertrauenswürdig sein; der USB-Generator berücksichtigt dies jetzt.

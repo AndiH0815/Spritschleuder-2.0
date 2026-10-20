@@ -50,6 +50,10 @@ void ArduinoComm::send(sprit::Message type) {
 }
 bool ArduinoComm::start(const sprit::Plan &p, const std::string &who, std::string &error) {
     std::lock_guard<std::mutex> lock(mutex);
+    if (network_setup) {
+        error = "Pumpenstarts im WLAN-Setup gesperrt";
+        return false;
+    }
 #ifndef CONFIG_SPRIT_HARDWARE_CONFIRMED
     error = "Hardwarefreigabe fehlt: Board, Treiber und Pins zuerst pruefen";
     return false;
@@ -96,6 +100,16 @@ void ArduinoComm::heartbeat(const std::string &who, uint32_t job) {
 }
 void ArduinoComm::abort() {
     std::lock_guard<std::mutex> lock(mutex);
+    stopLocked();
+}
+bool ArduinoComm::setNetworkSetup(bool enabled, bool stopActive) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (enabled && current.busy && !stopActive) return false;
+    network_setup = enabled;
+    if (enabled && current.busy) stopLocked();
+    return true;
+}
+void ArduinoComm::stopLocked() {
     if (!current.busy)
         current.error.clear();
     if (!stopping) {
