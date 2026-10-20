@@ -64,6 +64,7 @@ int main() {
     fail_commit = true;
     assert(settings.replace(pumps) != ESP_OK && !settings.all()[0].active);
     fail_commit = false;
+    fake_nvs["bar"] = {}; // Empty namespace after an interrupted first setup.
     BarSettings bar;
     assert(bar.init() == ESP_OK);
     auto configuration = bar.all();

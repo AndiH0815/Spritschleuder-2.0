@@ -28,6 +28,7 @@ esp_err_t BarSettings::init() {
     if (e != ESP_OK) return e;
     size_t size = 0;
     e = nvs_get_str(n, "v1", nullptr, &size);
+    if (e == ESP_ERR_NVS_NOT_FOUND) { nvs_close(n); return ESP_OK; }
     if (e != ESP_OK || size > 8192) { nvs_close(n); return e == ESP_OK ? ESP_ERR_INVALID_SIZE : e; }
     std::string text(size, '\0');
     e = nvs_get_str(n, "v1", &text[0], &size); nvs_close(n);

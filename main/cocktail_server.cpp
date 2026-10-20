@@ -283,7 +283,7 @@ esp_err_t CocktailServer::pageHandler(httpd_req_t *r) {
     httpd_resp_set_hdr(r, "X-Frame-Options", "DENY");
     httpd_resp_set_hdr(r, "Content-Security-Policy",
                        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
-                       "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+                       "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
                        "frame-ancestors 'none'; base-uri 'none'");
     return httpd_resp_send(r, reinterpret_cast<const char *>(page_start), page_end - page_start);
 }

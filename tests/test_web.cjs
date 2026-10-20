@@ -7,9 +7,13 @@ let pumps=Array.from({length:8},(_,i)=>({active:i<4,ingredient:i+1,ml_per_second
 let configuration={ingredients:[{id:1,name:'Zutat 1'},{id:4,name:'Limette'}],glasses:[{name:'Klein',ml:200},{name:'Groß',ml:400}]};
 let recipes=[{id:1,name:'Cuba Libre',manual:'Cola',photo:'',review:false,available:true,portions:[{ingredient:1,ml:40,strength:true},{ingredient:4,ml:20,strength:false}]}];
 let nextId=2;
+// Exercise the real firmware policy rather than a less restrictive test page.
+const policySource=fs.readFileSync('main/cocktail_server.cpp','utf8').split('"Content-Security-Policy",')[1].split(');')[0];
+const policy=Array.from(policySource.matchAll(/"([^"]*)"/g),m=>m[1]).join('');
+
 const server=http.createServer(async(req,res)=>{
   const path=new URL(req.url,'http://localhost').pathname;
-  if(path==='/'){res.setHeader('Content-Type','text/html');return res.end(fs.readFileSync('main/web.html'))}
+  if(path==='/'){res.setHeader('Content-Type','text/html');res.setHeader('Content-Security-Policy',policy);return res.end(fs.readFileSync('main/web.html'))}
   const chunks=[];for await(const chunk of req)chunks.push(chunk);const raw=Buffer.concat(chunks);
   const data=req.headers['content-type']==='application/json'?JSON.parse(raw.toString()):{};
   const reply=(obj,code=200)=>{res.writeHead(code,{'Content-Type':'application/json'});res.end(JSON.stringify(obj))};
@@ -26,7 +30,7 @@ const server=http.createServer(async(req,res)=>{
     if(status.busy)return reply({error:'Ausgabe aktiv'},409);
     if(path==='/api/test'&&(!admin||!pumps[data.pump].active))return reply({error:'Pumpe gesperrt'},403);
     orders++;if(path==='/api/order'){lastOrder=data;const recipe=recipes.find(r=>r.id===data.recipe_id);const automatic=recipe.portions.reduce((a,p)=>a+p.ml*data.quantity_ml/400*(p.strength?data.strength:1),0);status.manual_ml=data.quantity_ml-automatic}
-    status={...status,state:'running',busy:true,job:status.job+1,sequence:data.sequence,duration_ms:data.duration_ms||10000};return reply({...status,admin})
+    status={...status,state:'running',busy:true,elapsed_ms:0,outputs:1,job:status.job+1,sequence:data.sequence,duration_ms:data.duration_ms||10000};return reply({...status,admin})
   }
   if(!admin)return reply({error:'Verwaltung erforderlich'},403);
   if(path==='/api/pumps'){if(req.method==='POST')pumps=data.pumps;return reply(req.method==='POST'?{}:pumps)}
@@ -41,6 +45,7 @@ const server=http.createServer(async(req,res)=>{
   const browser=await chromium.launch({executablePath:process.env.SPRIT_CHROMIUM,args:['--no-sandbox','--disable-dev-shm-usage'],headless:true});
   try{
     const page=await browser.newPage({viewport:{width:1024,height:1000}}),errors=[];page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));
+    await page.addInitScript(()=>{delete Element.prototype.replaceChildren});
     await page.goto('http://127.0.0.1:'+server.address().port+'/');
     await page.locator('#password').fill('wrong');await page.locator('#loginForm button').click();await page.getByText('Falsches Passwort',{exact:true}).waitFor();
     await page.locator('#password').fill('test-access');await page.locator('#loginForm button').click();await page.locator('#cards button').waitFor();
@@ -68,6 +73,7 @@ const server=http.createServer(async(req,res)=>{
     await page.locator('#savePumps').click();await page.getByText('Pumpeneinstellungen gespeichert',{exact:true}).waitFor();
     await page.locator('[data-view=guest]').click();await page.locator('#size').selectOption('350');await page.locator('#strength').selectOption('1');await page.locator('[data-recipe="1"]').click();await page.locator('#order').click();await page.locator('#running').waitFor();
     assert.equal(lastOrder.quantity_ml,350);assert.equal(lastOrder.strength,1);
+    status.elapsed_ms=status.duration_ms;await page.waitForTimeout(450);assert(await page.locator('[data-view=guest]').isDisabled());assert(await page.locator('#finish').isHidden());
     await page.locator('#stop').click();await page.waitForTimeout(650);assert(status.state==='stopping'&&await page.locator('[data-view=guest]').isDisabled());
     status={...status,state:'aborted',busy:false};await page.locator('#guest').waitFor();assert(await page.locator('#finish').isHidden());
     await page.locator('#order').click();await page.locator('#running').waitFor();status={...status,state:'done',busy:false};await page.locator('#finish').waitFor();assert((await page.locator('#finishText').textContent()).includes('298 ml Cola'));
