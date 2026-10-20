@@ -17,8 +17,9 @@ jobs:
         shell: bash
         run: |
           . /opt/esp/idf/export.sh
-          idf.py -B build-ci -DIDF_TARGET=esp32c3 build
+          idf.py -B build-ci -DIDF_TARGET=esp32c3 reconfigure
           python -c 'import pathlib; print("RESOLVED_DEPENDENCIES_BEGIN"); print(pathlib.Path("dependencies.lock").read_text()); print("RESOLVED_DEPENDENCIES_END")'
+          idf.py -B build-ci -DIDF_TARGET=esp32c3 build
       - name: Host control, storage and access checks
         shell: bash
         run: |
