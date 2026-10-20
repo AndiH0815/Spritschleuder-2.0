@@ -1,5 +1,7 @@
 #include "../main/pump_settings.h"
 #include "../main/recipes.h"
+#include "../main/bar_settings.h"
+#include <limits>
 #include "fakes/nvs.h"
 #include <cassert>
 #include <iostream>
@@ -20,6 +22,7 @@ int main() {
     auto recipe = recipes[0];
     recipe.needs_review = false;
     recipe.name = "Cuba Libre";
+    recipe.photo_key = "1234567890abcdef";
     recipe.dosing.count = 2;
     recipe.dosing.portions[0] = {1, 40, true};
     recipe.dosing.portions[1] = {4, 20, false};
@@ -39,6 +42,7 @@ int main() {
     RecipeStore reboot;
     assert(reboot.init() == ESP_OK);
     assert(reboot.all().size() == 2 && reboot.get(added.id, after) && after.name == "Neu");
+    assert(after.photo_key == "1234567890abcdef");
     assert(fake_nvs["recipes"]["items"] == old_blob);
     PumpSettings settings;
     assert(settings.init() == ESP_OK);
@@ -60,6 +64,28 @@ int main() {
     fail_commit = true;
     assert(settings.replace(pumps) != ESP_OK && !settings.all()[0].active);
     fail_commit = false;
+    BarSettings bar;
+    assert(bar.init() == ESP_OK);
+    auto configuration = bar.all();
+    assert(configuration.glasses[0].ml == 200 && configuration.glasses[1].ml == 400);
+    configuration.ingredients = {{1, "Rum"}, {4, "Limette"}};
+    configuration.glasses[1] = {"Partyglas", 350};
+    assert(bar.replace(configuration) == ESP_OK);
+    BarSettings bar_reboot;
+    assert(bar_reboot.init() == ESP_OK && bar_reboot.all().ingredients[0].name == "Rum" &&
+           bar_reboot.all().glasses[1].ml == 350);
+    configuration.ingredients[0].name = "Neuer Rum";
+    fail_commit = true;
+    assert(bar.replace(configuration) != ESP_OK && bar.all().ingredients[0].name == "Rum");
+    fail_commit = false;
+    configuration.ingredients[1].id = 1;
+    assert(bar.replace(configuration) == ESP_ERR_INVALID_ARG);
+    configuration.ingredients[1].id = 4;
+    configuration.glasses[0].ml = std::numeric_limits<double>::infinity();
+    assert(bar.replace(configuration) == ESP_ERR_INVALID_ARG);
+    fake_nvs["bar"]["v1"] = {'{', '!', '}', 0};
+    BarSettings invalid_bar;
+    assert(invalid_bar.init() != ESP_OK);
     fake_nvs["recipes"]["v2"] = {'{', '!', '}', 0};
     RecipeStore broken;
     assert(broken.init() != ESP_OK);

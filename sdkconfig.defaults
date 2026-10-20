@@ -5,3 +5,7 @@ CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 
 # HTTPS must fit the existing 1 MiB application partition.
 CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# Image storage is appended after the unchanged application/NVS addresses.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"

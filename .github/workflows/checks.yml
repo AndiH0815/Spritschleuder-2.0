@@ -1,7 +1,5 @@
 name: Firmware and control checks
 on:
-  push:
-    branches: [feature/eight-pump-controller]
   pull_request:
 permissions:
   contents: read
@@ -26,3 +24,14 @@ jobs:
           apt-get update -qq
           apt-get install -y --no-install-recommends g++ libssl-dev
           CJSON_SOURCE="$PWD/managed_components/espressif__cjson/cJSON" sh tools/test.sh
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install browser test runtime
+        run: |
+          npm install --no-save playwright@1.55.1
+          npx playwright install --with-deps chromium
+      - name: Tablet menus and dispensing flow
+        run: node tests/test_web.cjs

@@ -15,6 +15,8 @@
 #include "button_manager.h"
 #include "recipes.h"
 #include "pump_settings.h"
+#include "bar_settings.h"
+#include "photo_store.h"
 
 static const char *TAG = "cocktailbot_main";
 
@@ -32,6 +34,9 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(ret);
     ESP_ERROR_CHECK(RecipeStore::getInstance().init());
     ESP_ERROR_CHECK(PumpSettings::getInstance().init());
+    ESP_ERROR_CHECK(BarSettings::getInstance().init());
+    if (PhotoStore::getInstance().init() != ESP_OK)
+        ESP_LOGW(TAG, "Bildspeicher nicht verfuegbar; vorhandene Daten bleiben erhalten");
     
     // Display initialisieren
     DisplayManager::getInstance().init();

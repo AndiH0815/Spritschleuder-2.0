@@ -1,32 +1,208 @@
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spritschleuder</title><link rel="icon" href="data:,"><style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:auto;max-width:950px;padding:24px;font:17px system-ui;background:#151715;color:#f1f3ed}h1{font-size:30px;font-weight:500}h2{font-size:22px;font-weight:500}section{background:#222722;border-radius:16px;padding:22px;margin:18px 0}button,input,select,textarea{font:inherit;padding:12px;border:1px solid #657362;border-radius:8px;max-width:100%;background:#30382e;color:inherit}button{cursor:pointer;background:#b6d98c;color:#162014;min-height:48px}button:disabled{opacity:.4;cursor:default}button.stop{background:#eb9c8c}label{display:inline-block;margin:8px 12px 8px 0}small{color:#c3cdbb}nav{display:flex;gap:10px;flex-wrap:wrap}#cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}.card{display:flex;flex-direction:column;gap:12px;min-height:100px;text-align:left}textarea{width:100%;min-height:240px;font-family:monospace;font-size:14px}#message{white-space:pre-wrap;color:#f6d296}.pump{display:grid;grid-template-columns:80px 1fr 1fr;gap:8px;align-items:center;border-bottom:1px solid #4d5848;padding:12px 0}.pump input{width:100%}progress{width:100%;height:20px}[hidden]{display:none!important}@media(max-width:500px){body{padding:12px}.pump{grid-template-columns:70px 1fr}.pump label:last-child{grid-column:2}section{padding:14px}}
-</style></head><body><h1>Spritschleuder</h1><p id="message" role="status"></p><section id="login"><h2>Willkommen an der Bar</h2><form id="loginForm"><label>Passwort <input id="password" type="password" autocomplete="current-password" required></label><label><input type="checkbox" id="remember" checked> Angemeldet bleiben</label><button>Anmelden</button></form></section>
-<div id="app" hidden><nav><button data-view="guest">Drinks</button><button data-view="bar">Barkeeper</button><button data-view="tech">Technik</button><button id="logout">Abmelden</button></nav><section id="running" hidden><h2 id="runTitle">Wird gemixt …</h2><progress id="progress" max="100"></progress><p id="remaining"></p></section><button class="stop" id="stop">Alle Pumpen stoppen / Fehler quittieren</button>
-<section id="guest"><h2>Was darf es sein?</h2><label>Glas <select id="size"><option value="200">Klein · 200 ml</option><option value="400">Groß · 400 ml</option></select></label><label>Stärke <select id="strength"><option value="0.5">Leicht</option><option value="1" selected>Normal</option><option value="1.5">Stark</option></select></label><div id="cards"></div><p id="finish"></p></section>
-<section id="adminLogin" hidden><h2>Verwaltung freigeben</h2><form id="adminForm"><label>Verwaltungspasswort <input id="adminPassword" type="password" autocomplete="current-password" required></label><button>Freigeben</button></form></section>
-<section id="bar" hidden><h2>Rezepte</h2><p>Grundrezept für 400 ml Flüssigkeit. Zutaten werden über ihre feste Kennung zugeordnet, unabhängig vom Pumpenplatz.</p><select id="recipeChoice"><option value="">Neues Rezept</option></select><label>Name <input id="recipeName" maxlength="64"></label><label>Manuell auffüllen mit <input id="manual" maxlength="64" placeholder="z. B. Cola"></label><p><small>Zutaten bearbeiten: Kennung, ml und true/false für die Stärkeauswahl. Der komfortable Fotoeditor aus der Vorschau folgt in einem separaten Schritt.</small></p><textarea id="parts" aria-label="Zutaten">[{"ingredient":1,"ml":40,"strength":true},{"ingredient":4,"ml":20,"strength":false}]</textarea><button id="saveRecipe">Rezept speichern</button><button id="deleteRecipe">Rezept löschen</button></section>
-<section id="tech" hidden><h2>Acht Pumpenplätze</h2><p id="hardware"></p><small>Die Zutatenkennung bleibt beim Flaschenwechsel bzw. Umstecken gleich. Gleiche aktive Kennungen werden abgelehnt. Neue Pumpen zuerst kalibrieren.</small><div id="pumps"></div><button id="savePumps">Pumpeneinstellungen speichern</button><h2>Kalibrieren / Vorfüllen / Spülen</h2><label>Pumpe <select id="testPump"></select></label><label>Laufzeit in Sekunden <input id="seconds" type="number" min="0.1" max="30" step="0.1" value="10"></label><button id="test">Begrenzten Lauf starten</button><label>Gemessene ml <input id="measured" type="number" min="0.1" step="0.1"></label><button id="calibrate">Kalibrierwert übernehmen</button><p><small>Wiegeüberwachung: deaktiviert. Der Sensoradapter folgt nach Festlegung von Typ und Anschlussbelegung.</small></p></section></div>
-<script>
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Spritschleuder · Deine Bar</title>
+<style>
+:root{color-scheme:light;--ink:#252b25;--muted:#687065;--paper:#f4f1e9;--panel:#fffdf8;--line:#dfdfd3;--green:#244f40;--accent:#ce693b;--red:#a8342f}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button,input,select{font:inherit}button,input,select{min-height:46px;border-radius:12px;border:1px solid var(--line);padding:10px 13px;max-width:100%}input,select{width:100%;background:#fff;color:var(--ink);min-width:0}button{cursor:pointer;background:var(--green);color:white;border-color:transparent;font-weight:650}button:disabled{opacity:.45;cursor:default}button.secondary{color:var(--ink);background:#eceee5}button.danger{background:var(--red)}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:3px}[hidden]{display:none!important}main{max-width:1120px;margin:auto;padding:24px}.brand{font-size:13px;font-weight:800;letter-spacing:.16em}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.top h1{font-size:20px;margin:0}.top small{color:var(--muted)}h2{font-size:clamp(26px,5vw,42px);letter-spacing:-.04em;line-height:1.1;margin:20px 0 12px}h3{font-size:20px;margin:0 0 14px}p{margin:8px 0 18px}.muted,small{color:var(--muted)}nav{display:flex;gap:6px;flex-wrap:wrap;background:#e8e9df;border-radius:16px;padding:5px;margin:26px 0}nav button{background:transparent;color:var(--ink);flex:1;min-width:0;font-size:14px;padding:10px 8px}nav button[aria-current=page]{background:var(--panel);box-shadow:0 2px 7px #00000009}.panel{background:var(--panel);padding:22px;border:1px solid var(--line);border-radius:20px;margin:18px 0}.narrow{max-width:440px;margin:9vh auto}.row{display:flex;align-items:end;gap:14px;flex-wrap:wrap}.row>label,.grow{flex:1;min-width:150px}label{display:block;font-size:14px;font-weight:600;margin-bottom:14px}label input,label select{margin-top:6px}label.check{display:flex;align-items:center;gap:9px;font-weight:500}input[type=checkbox]{width:21px;min-height:21px;flex-shrink:0;margin:0;accent-color:var(--green)}.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:22px 0}.drink{padding:0;text-align:left;background:var(--panel);color:var(--ink);border:1px solid var(--line);overflow:hidden;border-radius:20px;font-weight:400;position:relative}.drink[aria-pressed=true]{outline:3px solid var(--accent);outline-offset:2px}.photo{aspect-ratio:8/5;background:linear-gradient(135deg,#dce5d3,#b3c7b0);display:flex;align-items:center;justify-content:center;overflow:hidden}.photo svg{height:70%;opacity:.65}.photo img{width:100%;height:100%;object-fit:cover}.drink strong{display:block;font-size:21px;line-height:1.2;margin:16px 16px 4px;overflow-wrap:anywhere}.drink small{display:block;margin:0 16px 17px}.tag{font-size:12px;display:inline-block;background:#e7eddf;color:var(--green);padding:4px 9px;border-radius:50px;margin-bottom:8px}.selection{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;border-color:var(--green)}.selection p{margin:4px 0}.selection button{min-width:170px}.notice{border-radius:12px;padding:12px 15px;background:#fff1d9;margin:12px 0;overflow-wrap:anywhere}.warning{background:#f9e9e4;color:#7c372a}.stopbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.stopbar small{flex:1;min-width:130px}.stopbar button{font-size:14px}.progress{width:100%;height:14px;accent-color:var(--green);margin:24px 0 12px}.metric{font-size:48px;letter-spacing:-.05em}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}.pump{display:grid;grid-template-columns:minmax(90px,.8fr) minmax(120px,1.4fr) minmax(90px,.8fr);gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}.pump label{margin:0}.pump b{font-size:15px}.part{display:grid;grid-template-columns:minmax(110px,2fr) minmax(75px,1fr) minmax(85px,1fr);gap:10px;align-items:center;margin:10px 0}.part label{margin:0}.part .check{font-size:12px}.ingredient{display:flex;gap:10px;align-items:center;margin-bottom:10px}.ingredient small{min-width:34px}.ingredient button{min-width:44px;padding:8px}.photo-editor img{width:100%;aspect-ratio:8/5;object-fit:cover;border-radius:14px}input[type=range]{padding:0;min-height:36px}.toolbar{display:flex;gap:10px;flex-wrap:wrap}.toolbar>*{flex:1;min-width:150px}#finish{border-color:var(--green)}#notice:empty{display:none}.subtle{font-size:13px}.status-dot{display:inline-block;width:8px;height:8px;background:#90aa87;border-radius:50%;margin-right:6px}
+@media(max-width:760px){main{padding:18px}.cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.grid2{grid-template-columns:1fr}.panel{padding:18px}.pump{grid-template-columns:minmax(80px,.8fr) minmax(90px,1.2fr) minmax(75px,.7fr);gap:8px}.pump input,.pump select{padding:8px}.part{gap:7px}.part input,.part select{padding:8px}.top small{font-size:12px}}
+@media(max-width:390px){.cards{grid-template-columns:1fr}.pump{grid-template-columns:1fr 1fr}.pump>label:last-child{grid-column:2}.part{grid-template-columns:1.4fr .8fr}.part .check{grid-column:1/-1}nav button{font-size:12px}.toolbar>*{min-width:100%}.row>label{min-width:100%}}
+</style></head><body><main>
+<header class="top"><div><div class="brand">SPRITSCHLEUDER</div><small>Deine Bar. Dein Drink.</small></div><button id="logout" class="secondary" hidden>Abmelden</button></header>
+<section id="login" class="panel narrow"><span class="tag">Willkommen an der Bar</span><h2>Einmal anmelden.<br>Dann genießen.</h2><p class="muted">Gib das Passwort für diese Spritschleuder ein.</p><form id="loginForm"><label>Passwort<input id="password" type="password" autocomplete="current-password" required></label><label class="check"><input id="remember" type="checkbox" checked>Auf diesem Tablet angemeldet bleiben</label><button style="width:100%">Zur Bar</button></form></section>
+<div id="notice" class="notice" role="status" aria-live="polite"></div>
+<div id="app" hidden>
+<nav aria-label="Bereiche"><button data-view="guest" aria-current="page">Gast</button><button data-view="bar">Barkeeper</button><button data-view="tech">Maintenance</button></nav>
+<div class="stopbar"><small id="connection"><span class="status-dot"></span>Verbinde mit der Maschine …</small><button id="stop" class="danger">Alle Pumpen stoppen</button></div>
+<div id="hardware" class="notice warning" hidden>Die Ausgabe ist bis zur Prüfung der Hardware gesperrt. Menüs und Verwaltung können bereits vorbereitet werden.</div>
+<section id="running" class="panel" hidden><span class="tag">Dein Drink wird gemixt</span><h2 id="runTitle">Einen Moment bitte …</h2><p>Bitte lass das Glas unter dem Auslauf stehen.</p><progress id="progress" class="progress" max="100" value="0"></progress><div class="metric" id="remaining">…</div><p id="runStatus" class="muted">Die Maschine bestätigt den Abschluss.</p></section>
+<section id="adminLogin" class="panel narrow" hidden><h2>Nur für die Barcrew.</h2><p class="muted">Barkeeper und Maintenance benötigen die zusätzliche Verwaltungsfreigabe.</p><form id="adminForm"><label>Verwaltungspasswort<input id="adminPassword" type="password" autocomplete="off" required></label><button>Freigeben</button> <button type="button" id="cancelAdmin" class="secondary">Zurück</button></form></section>
+<section id="guest">
+<h2>Was darf’s sein?</h2><p class="muted">Glasgröße und Stärke wählen, Drink antippen und los geht’s.</p>
+<div class="row"><label>Dein Glas<select id="size"></select></label><label>Deine Stärke<select id="strength"><option value="0.5">Leicht</option><option value="1" selected>Normal</option><option value="1.5">Stark</option></select></label></div>
+<div id="finish" class="panel" hidden><span class="tag">Die Basis ist fertig</span><h3 id="finishTitle"></h3><p id="finishText"></p><button id="finishOk">Fertig · Nächster Drink</button></div>
+<div id="cards" class="cards"></div>
+<div id="selection" class="panel selection" hidden><div><span class="tag">Deine Auswahl</span><h3 id="selectedName"></h3><p id="selectedAmounts" class="muted"></p></div><button id="order">Drink mixen</button></div>
+</section>
+<section id="bar" hidden><h2>Hinter der Bar.</h2><p class="muted">Rezepte, Zutaten und die passenden Gläser für deine Party.</p>
+<div class="grid2"><section class="panel"><h3>Rezepte</h3><label>Rezept auswählen<select id="recipeChoice"><option value="0">Neues Rezept</option></select></label><form id="recipeForm"><label>Drinkname<input id="recipeName" maxlength="64" required placeholder="Cuba Libre"></label><label>Zum Schluss von Hand auffüllen mit<input id="manual" maxlength="64" placeholder="Cola, Soda oder Tonic"></label><p class="subtle muted">Mengen für 400 ml fertigen Drink. Der Rest wird von Hand aufgefüllt. „Stärke“ verändert nur die markierten Zutaten.</p><div id="parts"></div><p id="recipeTotal" class="subtle"></p><div class="toolbar"><button id="saveRecipe">Rezept speichern</button><button id="deleteRecipe" type="button" class="secondary">Rezept löschen</button></div></form></section>
+<section class="panel photo-editor"><h3>Das Foto zum Drink</h3><p class="muted">Ein Foto auswählen, den Ausschnitt einstellen und auf der Maschine speichern. Es bleibt auch ohne Internet verfügbar.</p><div class="photo" id="savedPhoto"></div><label style="margin-top:15px">Foto auswählen<input id="photoFile" type="file" accept="image/*"></label><div id="photoCrop" hidden><img id="photoPreview" alt="Vorschau des Bildausschnitts"><label>Ausschnitt<input id="photoPosition" type="range" min="0" max="100" value="50"></label></div><div class="toolbar"><button id="uploadPhoto" disabled>Foto speichern</button><button id="deletePhoto" class="secondary">Foto entfernen</button></div><p class="subtle muted" id="photoHint">Zuerst ein Rezept speichern oder auswählen.</p></section></div>
+<div class="grid2"><section class="panel"><h3>Zutaten benennen</h3><p class="muted">Zutaten bleiben mit ihren Rezepten verbunden, auch wenn du sie einer anderen Pumpe zuordnest.</p><div id="ingredients"></div><div class="toolbar"><button id="addIngredient" class="secondary">Zutat hinzufügen</button></div></section><section class="panel"><h3>Deine zwei Glasgrößen</h3><div id="glasses"></div><p class="subtle muted">Hier die gewünschte Flüssigkeitsmenge eintragen. Eis und Platz bis zum Glasrand vorher abziehen.</p></section></div><button id="saveBar">Zutaten und Glasgrößen speichern</button>
+</section>
+<section id="tech" hidden><h2>Alles im Fluss.</h2><p class="muted">Pumpen zuordnen, einzeln aktivieren und mit der endgültigen Schlauchlänge kalibrieren.</p>
+<section class="panel"><h3>Acht Pumpenplätze</h3><div id="pumps"></div><button id="savePumps" style="margin-top:18px">Pumpeneinstellungen speichern</button><p class="subtle muted">Deaktivierte Plätze behalten Zutat und Kalibrierwert. Bei einer neuen Zutat die Fördermenge neu prüfen.</p></section>
+<div class="grid2"><section class="panel"><h3>Kalibrieren, vorfüllen, spülen</h3><label>Pumpe<select id="testPump"></select></label><label>Aktion<select id="testMode"><option value="calibrate">Kalibrierlauf</option><option value="prime">Leitung vorfüllen</option><option value="rinse">Mit Wasser spülen</option></select></label><label>Laufzeit in Sekunden<input id="seconds" type="number" min="0.1" max="30" step="0.1" value="10"></label><p class="subtle muted" id="testHint">Messgefäß unterstellen. Nach dem bestätigten Lauf die aufgefangene Menge eintragen.</p><button id="test">Lauf starten</button><div id="calibration" hidden style="margin-top:18px"><label>Aufgefangene Menge in ml<input id="measured" type="number" min="0.1" max="3000" step="0.1"></label><button id="calibrate" class="secondary">Kalibrierwert übernehmen</button><p class="subtle muted">Anschließend die Pumpeneinstellungen speichern.</p></div></section>
+<section class="panel"><h3>Überwachung</h3><label class="check"><input id="scaleEnabled" type="checkbox" disabled>Waagenüberwachung aktiv</label><p class="muted">Vorbereitet ist die Bedienung ohne Waage. Für Glasentnahme und fehlenden Gewichtszuwachs müssen Sensor und Anschlüsse zuerst feststehen.</p><p class="subtle">Derzeit wird kein Glas erkannt. Die Zeitdosierung benötigt eine Kalibrierung je Pumpe.</p><h3 style="margin-top:24px">Verbindung &amp; Ausgabe</h3><p id="diagnostics" class="subtle"></p><p class="muted">Der Stopp oben erreicht immer alle acht Ausgänge. Nach einer Unterbrechung startet kein Drink automatisch erneut.</p></section></div>
+</section>
+</div>
+<svg id="glassIcon" hidden xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 160"><path d="M40 26h100l-12 105H52Z" fill="#f5f5dd" stroke="#244f40" stroke-width="5"/><path d="m48 69 7 57h69l7-57Z" fill="#ce693b"/><path d="m64 58 19 4-4 19-19-4Zm31 13 19-4 4 19-19 4Z" fill="#fff" opacity=".7"/><path d="m106 14-18 78" stroke="#244f40" stroke-width="5" stroke-linecap="round"/><circle cx="132" cy="33" r="21" fill="#a4b861" stroke="#244f40" stroke-width="4"/></svg>
+<canvas id="photoCanvas" width="640" height="400" hidden></canvas>
+</main><script>
 'use strict';
-var state={},recipes=[],pumps=[],view='guest',wanted='guest',ownerJob=0,activeManual='',requestBusy=false,lastCalibration=null,mutation=0;
-function el(id){return document.getElementById(id)}function message(t){el('message').textContent=t||''}
-async function api(path,data){var options={credentials:'same-origin',cache:'no-store'};if(data!==undefined){if(path!=='heartbeat')mutation++;options.method='POST';options.headers={'Content-Type':'application/json'};options.body=JSON.stringify(data)}var response=await fetch('/api/'+path,options);var result=await response.json();if(response.status===401){el('app').hidden=true;el('login').hidden=false;ownerJob=0}if(!response.ok)throw Error(result.error||'Verbindung fehlgeschlagen');return result}
-function locked(){return !!state.busy||requestBusy}function show(){['guest','bar','tech'].forEach(function(v){el(v).hidden=v!==view||state.busy});el('adminLogin').hidden=view!=='admin'||state.busy;document.querySelectorAll('nav button').forEach(function(b){b.disabled=locked()});el('running').hidden=!state.busy;el('progress').value=state.duration_ms?Math.min(99,state.elapsed_ms/state.duration_ms*100):0;el('remaining').textContent=state.state==='stopping'?'Stopp wird bestätigt …':Math.max(0,Math.ceil((state.duration_ms-state.elapsed_ms)/1000))+' Sekunden';el('hardware').textContent=state.hardware_enabled?'Hardwarefreigabe aktiv. Reale Pumpenläufe möglich.':'Entwicklungsstand: reale Pumpenausgabe gesperrt, bis die Hardware geprüft wurde.';renderCards()}
-function renderCards(){var host=el('cards');host.textContent='';recipes.forEach(function(r){var b=document.createElement('button');b.className='card';b.textContent=r.name+(r.review?' · bitte prüfen':r.available?'':' · derzeit nicht verfügbar');b.disabled=locked()||!r.available||!state.online||!state.hardware_enabled;b.onclick=function(){order(r)};host.appendChild(b)})}
-async function load(){state=await api('status');recipes=await api('recipes');el('login').hidden=true;el('app').hidden=false;var choice=el('recipeChoice');choice.textContent='';choice.add(new Option('Neues Rezept',''));recipes.forEach(function(r){choice.add(new Option(r.name,r.id))});show()}
-async function order(r){if(locked())return;requestBusy=true;show();try{activeManual=r.manual;el('finish').textContent='';state=await api('order',{recipe_id:r.id,quantity_ml:+el('size').value,strength:+el('strength').value,boot_id:state.boot_id,sequence:state.sequence+1});ownerJob=state.job;message('')}catch(e){message(e.message)}finally{requestBusy=false;show()}}
-el('loginForm').onsubmit=async function(e){e.preventDefault();try{await api('login',{password:el('password').value,remember:el('remember').checked});el('password').value='';await load();message('')}catch(e){message(e.message)}};
-document.querySelectorAll('[data-view]').forEach(function(b){b.onclick=async function(){if(locked())return;wanted=b.dataset.view;if(wanted!=='guest'&&!state.admin){view='admin';show();return}view=wanted;if(view==='tech')await loadPumps();show()}});
-el('adminForm').onsubmit=async function(e){e.preventDefault();try{state=await api('admin',{password:el('adminPassword').value});el('adminPassword').value='';view=wanted;if(view==='tech')await loadPumps();show();message('')}catch(e){message(e.message)}};
-el('stop').onclick=async function(){ownerJob=0;try{state=await api('abort',{});show()}catch(e){message('Stopp nicht bestätigt: '+e.message)}};
-el('logout').onclick=async function(){try{await api('logout',{});el('app').hidden=true;el('login').hidden=false;state={};view='guest';pumps=[];recipes=[]}catch(e){message(e.message)}};
-async function loadPumps(){pumps=await api('pumps');var host=el('pumps');host.textContent='';el('testPump').textContent='';pumps.forEach(function(p,i){var row=document.createElement('div');row.className='pump';var label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.checked=p.active;check.id='active'+i;label.appendChild(check);label.appendChild(document.createTextNode(' '+(i+1)));row.appendChild(label);[['ingredient','Zutat Nr.'],['ml_per_second','ml/s']].forEach(function(pair){var label=document.createElement('label');label.textContent=pair[1]+' ';var input=document.createElement('input');input.type='number';input.min=0;input.max=pair[0]==='ingredient'?255:100;input.step=pair[0]==='ingredient'?1:0.001;input.value=p[pair[0]];input.id=pair[0]+i;label.appendChild(input);row.appendChild(label)});host.appendChild(row);el('testPump').add(new Option('Pumpe '+(i+1),i))})}
-el('savePumps').onclick=async function(){try{pumps=pumps.map(function(p,i){return{active:el('active'+i).checked,ingredient:+el('ingredient'+i).value,ml_per_second:+el('ml_per_second'+i).value}});await api('pumps',{pumps:pumps});await load();message('Pumpeneinstellungen gespeichert')}catch(e){message(e.message)}};
-el('test').onclick=async function(){if(locked())return;requestBusy=true;lastCalibration=null;try{var seconds=+el('seconds').value,pump=+el('testPump').value;state=await api('test',{pump:pump,duration_ms:Math.round(seconds*1000),boot_id:state.boot_id,sequence:state.sequence+1});lastCalibration={pump:pump,seconds:seconds,job:state.job,finished:false};ownerJob=state.job;activeManual='';message('')}catch(e){message(e.message)}finally{requestBusy=false;show()}};
-el('calibrate').onclick=function(){var c=lastCalibration,ml=+el('measured').value;if(!c||!c.finished||!Number.isFinite(ml)||ml<=0||ml/c.seconds>100){message('Erst einen vollständigen Kalibrierlauf ausführen und die gemessene Menge eingeben');return}el('ml_per_second'+c.pump).value=(ml/c.seconds).toFixed(4);message('Kalibrierwert eingetragen. Jetzt Pumpeneinstellungen speichern.')};
-el('recipeChoice').onchange=function(){var id=+this.value,r=recipes.find(function(r){return r.id===id});el('recipeName').value=r?r.name:'';el('manual').value=r?r.manual:'';el('parts').value=JSON.stringify(r?r.portions:[{ingredient:1,ml:40,strength:true}],null,2)};
-el('saveRecipe').onclick=async function(){try{await api('recipes',{id:+el('recipeChoice').value,name:el('recipeName').value,manual:el('manual').value,portions:JSON.parse(el('parts').value)});await load();message('Rezept gespeichert')}catch(e){message(e.message)}};
-el('deleteRecipe').onclick=async function(){if(!el('recipeChoice').value||!confirm('Dieses Rezept löschen?'))return;try{await api('recipe/delete',{id:+el('recipeChoice').value});await load();message('Rezept gelöscht')}catch(e){message(e.message)}};
-async function poll(){try{if(!el('app').hidden){var before=state,epoch=mutation,pollOwner=ownerJob;var result=pollOwner?await api('heartbeat',{job:pollOwner}):await api('status');if(epoch!==mutation||pollOwner!==ownerJob){setTimeout(poll,400);return}state=result;if(before.boot_id&&state.boot_id!==before.boot_id){ownerJob=0;lastCalibration=null;message('Steuerung neu gestartet. Es wird kein Auftrag wiederholt.')}if(ownerJob&&!state.busy){if(state.state==='done'){if(lastCalibration&&lastCalibration.job===ownerJob)lastCalibration.finished=true;if(activeManual)el('finish').textContent='Fertig! Noch '+Math.round(state.manual_ml)+' ml '+activeManual+' von Hand auffüllen.'}ownerJob=0}if(state.error)message(state.error);show()}}catch(e){message('Verbindung unterbrochen. Ein Start wird nicht automatisch wiederholt. '+e.message)}setTimeout(poll,400)}
-load().catch(function(){});poll();
+var $=function(id){return document.getElementById(id)};
+var state={},recipes=[],pumps=[],bar={ingredients:[],glasses:[{name:'Klein',ml:200},{name:'Groß',ml:400}]};
+var view='guest',wanted='guest',selected=0,ownerJob=0,requestBusy=false,connected=false,mutation=0,polling=false,lastCalibration=null,activeDrink='',activeManual='',activeKind='drink',photoImage=null,photoUrl='',photoBlob=null;
+function notice(message){$('notice').textContent=message||''}
+function locked(){return !!state.busy||requestBusy}
+function resetLogin(){ownerJob=0;connected=false;$('app').hidden=true;$('login').hidden=false;$('logout').hidden=true}
+async function api(path,data){
+  var options={credentials:'same-origin',cache:'no-store'};
+  if(data!==undefined){options.method='POST';options.headers={'Content-Type':'application/json'};options.body=JSON.stringify(data);if(path!=='heartbeat')mutation++}
+  var response=await fetch('/api/'+path,options),result=await response.json();
+  if(response.status===401)resetLogin();
+  if(!response.ok)throw Error(result.error||'Die Anfrage ist fehlgeschlagen');
+  return result;
+}
+function action(fn){return function(event){if(event)event.preventDefault();Promise.resolve().then(fn).catch(function(e){notice(e.message)})}}
+function option(value,label){var item=document.createElement('option');item.value=value;item.textContent=label;return item}
+function nameFor(id){var item=bar.ingredients.find(function(x){return x.id===id});return item?item.name:'Zutat '+id}
+function ensureNames(){
+  var ids=[];recipes.forEach(function(r){r.portions.forEach(function(p){ids.push(p.ingredient)})});pumps.forEach(function(p){if(p.ingredient)ids.push(p.ingredient)});
+  ids.forEach(function(id){if(!bar.ingredients.some(function(x){return x.id===id}))bar.ingredients.push({id:id,name:'Zutat '+id})});
+}
+function ingredientSelect(value,empty){var select=document.createElement('select');if(empty)select.appendChild(option(0,'Keine Zutat'));bar.ingredients.forEach(function(x){select.appendChild(option(x.id,x.name))});if(value&&!bar.ingredients.some(function(x){return x.id===value}))select.appendChild(option(value,nameFor(value)));select.value=value||0;return select}
+function icon(){var svg=$('glassIcon').cloneNode(true);svg.removeAttribute('id');svg.removeAttribute('hidden');return svg}
+function photo(holder,recipe){holder.replaceChildren();if(recipe&&recipe.photo){var img=document.createElement('img');img.alt=recipe.name;img.loading='lazy';img.src='/api/photo/'+recipe.id+'?v='+recipe.photo;img.onerror=function(){holder.replaceChildren(icon())};holder.appendChild(img)}else holder.appendChild(icon())}
+function amounts(r){
+  var target=Number($('size').value),strength=Number($('strength').value),automatic=0;
+  r.portions.forEach(function(p){automatic+=p.ml*target/400*(p.strength?strength:1)});
+  return {automatic:automatic,manual:target-automatic,valid:automatic<=target+.001&&automatic>0};
+}
+function renderCards(){
+  var box=$('cards');box.replaceChildren();
+  if(!recipes.length){var p=document.createElement('p');p.className='muted';p.textContent='Hier erscheinen die Drinks, sobald der Barkeeper Rezepte angelegt hat.';box.appendChild(p)}
+  recipes.forEach(function(r){
+    var button=document.createElement('button');button.className='drink';button.dataset.recipe=r.id;button.setAttribute('aria-pressed',String(selected===r.id));
+    var image=document.createElement('div');image.className='photo';photo(image,r);button.appendChild(image);
+    var title=document.createElement('strong');title.textContent=r.name;button.appendChild(title);
+    var text=document.createElement('small');text.textContent=r.review?'Rezept bitte prüfen':!r.available?'Zutat oder Kalibrierung fehlt':r.manual?'Mit '+r.manual+' von Hand auffüllen':'Bereit zum Mixen';button.appendChild(text);
+    button.onclick=function(){selected=r.id;updateSelection();document.querySelectorAll('[data-recipe]').forEach(function(b){b.setAttribute('aria-pressed',String(Number(b.dataset.recipe)===selected))})};box.appendChild(button);
+  });updateSelection();
+}
+function updateSelection(){
+  var r=recipes.find(function(x){return x.id===selected});$('selection').hidden=!r;
+  if(r){var a=amounts(r);$('selectedName').textContent=r.name;$('selectedAmounts').textContent=a.valid?Math.round(a.automatic)+' ml aus der Maschine'+(a.manual>.1?' · danach '+Math.round(a.manual)+' ml '+(r.manual||'von Hand auffüllen'):''): 'Für diese Stärke ist das Glas zu klein.';$('order').disabled=locked()||!connected||!state.online||!state.hardware_enabled||!r.available||r.review||!a.valid}
+  $('size').disabled=locked();$('strength').disabled=locked();
+  document.querySelectorAll('[data-recipe]').forEach(function(button){var recipe=recipes.find(function(x){return x.id===Number(button.dataset.recipe)});button.disabled=locked()||!recipe.available||recipe.review});
+}
+function show(){
+  var busy=locked(),admin=!!state.admin;
+  ['guest','bar','tech'].forEach(function(id){$(id).hidden=busy||view!==id||(id!=='guest'&&!admin)});
+  $('adminLogin').hidden=busy||view==='guest'||admin;
+  $('running').hidden=!busy;
+  $('logout').disabled=busy;
+  document.querySelectorAll('[data-view]').forEach(function(button){button.disabled=busy;button.setAttribute('aria-current',button.dataset.view===view?'page':'false')});
+  $('hardware').hidden=!!state.hardware_enabled;
+  $('connection').textContent=!connected?'Verbindung unterbrochen · Ausgabe wird gestoppt':!state.online?'Pumpensteuerung nicht verbunden':busy?'Ausgabe läuft · Auswahl gesperrt':'Mit der Maschine verbunden';
+  $('stop').textContent=state.state==='fault'?'Alle Pumpen stoppen / Fehler quittieren':'Alle Pumpen stoppen';
+  $('runTitle').textContent=activeDrink||'Ein Auftrag läuft';
+  var percent=state.duration_ms?100*state.elapsed_ms/state.duration_ms:0;
+  $('progress').value=Math.max(0,Math.min(99,percent));
+  $('remaining').textContent=state.state==='stopping'?'Wird gestoppt …':requestBusy?'Wird gestartet …':Math.max(0,Math.ceil((state.duration_ms-state.elapsed_ms)/1000))+' s';
+  $('runStatus').textContent=state.state==='stopping'?'Warte auf die Stoppbestätigung der Pumpensteuerung.':'Fertig ist der Drink erst nach Bestätigung der Maschine.';
+  $('diagnostics').textContent='Pumpensteuerung: '+(state.online?'verbunden':'nicht verbunden')+' · Zustand: '+(state.state||'unbekannt')+' · Auftrag: '+(state.job||0)+(state.error?' · '+state.error:'');
+  if(state.error)notice(state.error);
+  updateSelection();
+}
+function renderSizes(){var current=$('size').value;$('size').replaceChildren();bar.glasses.forEach(function(g){$('size').appendChild(option(g.ml,g.name+' · '+g.ml+' ml'))});if(bar.glasses.some(function(g){return String(g.ml)===current}))$('size').value=current;else $('size').selectedIndex=1}
+function renderRecipeChoice(id){$('recipeChoice').replaceChildren(option(0,'Neues Rezept'));recipes.forEach(function(r){$('recipeChoice').appendChild(option(r.id,r.name+(r.review?' · bitte prüfen':'')))});$('recipeChoice').value=id||0}
+async function refreshRecipes(id){recipes=await api('recipes');ensureNames();renderRecipeChoice(id);renderCards()}
+async function load(){state=await api('status');connected=true;bar=await api('bar');recipes=await api('recipes');ensureNames();renderSizes();renderRecipeChoice(0);renderCards();$('login').hidden=true;$('app').hidden=false;$('logout').hidden=false;view='guest';show()}
+async function openView(target){if(locked())return;wanted=target;view=target;if(target!=='guest'&&state.admin){pumps=await api('pumps');ensureNames();renderBar();renderPumps();editRecipe()}show()}
+$('loginForm').onsubmit=action(async function(){state=await api('login',{password:$('password').value,remember:$('remember').checked});$('password').value='';notice('');await load()});
+$('adminForm').onsubmit=action(async function(){state=await api('admin',{password:$('adminPassword').value});$('adminPassword').value='';notice('');await openView(wanted)});
+$('cancelAdmin').onclick=action(function(){view='guest';show()});
+document.querySelectorAll('[data-view]').forEach(function(button){button.onclick=action(function(){return openView(button.dataset.view)})});
+$('logout').onclick=action(async function(){await api('logout',{});resetLogin();notice('')});
+$('size').onchange=$('strength').onchange=updateSelection;
+$('order').onclick=action(async function(){
+  if(locked()||!connected)return;var r=recipes.find(function(x){return x.id===selected});if(!r)return;
+  requestBusy=true;activeKind='drink';activeDrink=r.name;activeManual=r.manual;lastCalibration=null;$('finish').hidden=true;show();
+  try{state=await api('order',{recipe_id:r.id,quantity_ml:Number($('size').value),strength:Number($('strength').value),boot_id:state.boot_id,sequence:(state.sequence||0)+1});ownerJob=state.job;notice('')}finally{requestBusy=false;show()}
+});
+$('stop').onclick=action(async function(){state=await api('abort',{});show()});
+$('finishOk').onclick=function(){$('finish').hidden=true;selected=0;renderCards()};
+function renderBar(){
+  $('ingredients').replaceChildren();bar.ingredients.forEach(function(x){
+    var row=document.createElement('div');row.className='ingredient';var label=document.createElement('small');label.textContent='#'+x.id;row.appendChild(label);
+    var input=document.createElement('input');input.maxLength=48;input.value=x.name;input.setAttribute('aria-label','Name der Zutat '+x.id);input.dataset.ingredient=x.id;row.appendChild(input);
+    var remove=document.createElement('button');remove.className='secondary';remove.textContent='×';remove.setAttribute('aria-label','Zutat '+x.id+' entfernen');remove.onclick=action(function(){readNames();bar.ingredients=bar.ingredients.filter(function(v){return v.id!==x.id});renderBar()});row.appendChild(remove);$('ingredients').appendChild(row)
+  });
+  $('glasses').replaceChildren();bar.glasses.forEach(function(g,i){var row=document.createElement('div');row.className='row';
+    var label=document.createElement('label');label.textContent='Bezeichnung';var name=document.createElement('input');name.id='glassName'+i;name.maxLength=24;name.value=g.name;label.appendChild(name);row.appendChild(label);
+    var volume=document.createElement('label');volume.textContent='Flüssigkeit in ml';var input=document.createElement('input');input.id='glassMl'+i;input.type='number';input.min=20;input.max=1000;input.step=1;input.value=g.ml;volume.appendChild(input);row.appendChild(volume);$('glasses').appendChild(row)
+  });
+}
+function readNames(){document.querySelectorAll('[data-ingredient]').forEach(function(input){var item=bar.ingredients.find(function(x){return x.id===Number(input.dataset.ingredient)});if(item)item.name=input.value.trim()});bar.glasses=bar.glasses.map(function(g,i){return {name:$('glassName'+i).value.trim(),ml:Number($('glassMl'+i).value)}})}
+$('addIngredient').onclick=action(function(){readNames();if(bar.ingredients.length>=32)throw Error('Maximal 32 Zutaten');var id=1;while(bar.ingredients.some(function(x){return x.id===id}))id++;if(id>255)throw Error('Keine freie Zutatenkennung');bar.ingredients.push({id:id,name:''});renderBar();$('ingredients').lastChild.querySelector('input').focus()});
+$('saveBar').onclick=action(async function(){readNames();bar=await api('bar',bar);renderSizes();renderBar();renderPumps();editRecipe();renderCards();notice('Zutaten und Glasgrößen gespeichert')});
+function editRecipe(){
+  var id=Number($('recipeChoice').value),r=recipes.find(function(x){return x.id===id});
+  $('recipeName').value=r?r.name:'';$('manual').value=r?r.manual:'';$('parts').replaceChildren();
+  for(var i=0;i<8;i++)(function(index){
+    var part=r&&r.portions[index]||{ingredient:0,ml:0,strength:false};var row=document.createElement('div');row.className='part';
+    var select=ingredientSelect(part.ingredient,true);select.id='partIngredient'+index;select.setAttribute('aria-label','Zutat '+(index+1));row.appendChild(select);
+    var input=document.createElement('input');input.id='partMl'+index;input.type='number';input.min=0;input.max=400;input.step=.1;input.value=part.ml;input.setAttribute('aria-label','Menge in ml für Zutat '+(index+1));row.appendChild(input);
+    var check=document.createElement('label');check.className='check';var box=document.createElement('input');box.type='checkbox';box.id='partStrength'+index;box.checked=part.strength;check.appendChild(box);check.appendChild(document.createTextNode('Stärke'));row.appendChild(check);$('parts').appendChild(row);select.onchange=input.oninput=recipeTotal;
+  })(i);
+  $('deleteRecipe').disabled=!r;recipeTotal();clearPhotoSelection();photo($('savedPhoto'),r);$('deletePhoto').disabled=!r||!r.photo;
+  $('photoFile').disabled=!r||!state.photos_ready;$('photoHint').textContent=!state.photos_ready?'Bildspeicher noch nicht verfügbar. Partition und Flashgröße vor Ort prüfen.':r?'Das Foto wird direkt auf der Maschine gespeichert.':'Zuerst ein Rezept speichern oder auswählen.';
+}
+function recipeTotal(){var total=0;for(var i=0;i<8;i++)if(Number($('partIngredient'+i).value))total+=Number($('partMl'+i).value);$('recipeTotal').textContent=total<=400?total+' ml Maschine · '+Math.round((400-total)*10)/10+' ml von Hand auffüllen':'Die Zutaten überschreiten 400 ml.'}
+$('recipeChoice').onchange=editRecipe;
+$('recipeForm').onsubmit=action(async function(){
+  var portions=[];for(var i=0;i<8;i++){var id=Number($('partIngredient'+i).value),ml=Number($('partMl'+i).value);if(id&&ml>0)portions.push({ingredient:id,ml:ml,strength:$('partStrength'+i).checked});else if(id||ml)throw Error('Für jede verwendete Zutat eine Menge größer null eintragen')}
+  var r=await api('recipes',{id:Number($('recipeChoice').value),name:$('recipeName').value.trim(),manual:$('manual').value.trim(),portions:portions});await refreshRecipes(r.id);editRecipe();notice('Rezept gespeichert');
+});
+$('deleteRecipe').onclick=action(async function(){var id=Number($('recipeChoice').value);if(!id||!confirm('Dieses Rezept und sein Foto löschen?'))return;await api('recipe/delete',{id:id});if(selected===id)selected=0;await refreshRecipes(0);editRecipe();notice('Rezept gelöscht')});
+function renderPumps(){
+  $('pumps').replaceChildren();$('testPump').replaceChildren();
+  pumps.forEach(function(p,i){
+    var row=document.createElement('div');row.className='pump';var active=document.createElement('label');active.className='check';var check=document.createElement('input');check.type='checkbox';check.id='active'+i;check.checked=p.active;active.appendChild(check);active.appendChild(document.createTextNode('Pumpe '+(i+1)));row.appendChild(active);
+    var assigned=document.createElement('label');assigned.textContent='Zutat';var select=ingredientSelect(p.ingredient,true);select.id='ingredient'+i;assigned.appendChild(select);row.appendChild(assigned);
+    var rate=document.createElement('label');rate.textContent='ml pro Sekunde';var input=document.createElement('input');input.id='ml_per_second'+i;input.type='number';input.min=0;input.max=100;input.step=.0001;input.value=p.ml_per_second;rate.appendChild(input);row.appendChild(rate);$('pumps').appendChild(row);
+    var opt=option(i,'Pumpe '+(i+1)+' · '+(p.ingredient?nameFor(p.ingredient):'keine Zutat')+(p.active?'':' · deaktiviert'));opt.disabled=!p.active;$('testPump').appendChild(opt);
+  });var first=pumps.findIndex(function(p){return p.active});if(first>=0)$('testPump').value=first;$('test').disabled=first<0;
+}
+$('savePumps').onclick=action(async function(){
+  var next=pumps.map(function(p,i){return {active:$('active'+i).checked,ingredient:Number($('ingredient'+i).value),ml_per_second:Number($('ml_per_second'+i).value)}});
+  await api('pumps',{pumps:next});pumps=next;renderPumps();await refreshRecipes($('recipeChoice').value);notice('Pumpeneinstellungen gespeichert');
+});
+$('testMode').onchange=function(){$('testHint').textContent=$('testMode').value==='calibrate'?'Messgefäß unterstellen. Nach dem bestätigten Lauf die aufgefangene Menge eintragen.':$('testMode').value==='prime'?'Geeignetes Gefäß unterstellen. Die Leitung wird für die gewählte Zeit gefüllt.':'Flasche gegen geeignetes Spülwasser tauschen und Auffanggefäß unterstellen. Nach dem Lauf erfolgt kein automatischer Neustart.'};
+$('test').onclick=action(async function(){
+  if(locked())return;var pump=Number($('testPump').value),ms=Math.round(Number($('seconds').value)*1000),mode=$('testMode').value;
+  if(!pumps[pump]||!pumps[pump].active)throw Error('Pumpe deaktiviert');if(ms<100||ms>30000)throw Error('Laufzeit zwischen 0,1 und 30 Sekunden');
+  requestBusy=true;activeKind=mode;lastCalibration=null;$('calibration').hidden=true;activeDrink=(mode==='rinse'?'Spülen':mode==='prime'?'Vorfüllen':'Kalibrieren')+' · Pumpe '+(pump+1);show();
+  try{state=await api('test',{pump:pump,duration_ms:ms,boot_id:state.boot_id,sequence:(state.sequence||0)+1});ownerJob=state.job;if(mode==='calibrate')lastCalibration={pump:pump,seconds:ms/1000,job:state.job,done:false};notice('')}finally{requestBusy=false;show()}
+});
+$('calibrate').onclick=action(function(){if(!lastCalibration||!lastCalibration.done)throw Error('Kalibrierlauf zuerst abschließen');var value=Number($('measured').value)/lastCalibration.seconds;if(!Number.isFinite(value)||value<=0||value>100)throw Error('Gemessene Menge prüfen');$('ml_per_second'+lastCalibration.pump).value=value.toFixed(4);notice('Kalibrierwert übernommen · Pumpeneinstellungen noch speichern')});
+function clearPhotoSelection(){if(photoUrl)URL.revokeObjectURL(photoUrl);photoUrl='';photoImage=null;photoBlob=null;$('photoFile').value='';$('photoCrop').hidden=true;$('uploadPhoto').disabled=true}
+function cropPhoto(){
+  if(!photoImage)return;var canvas=$('photoCanvas');canvas.width=640;canvas.height=400;var context=canvas.getContext('2d'),scale=Math.max(640/photoImage.width,400/photoImage.height),w=640/scale,h=400/scale,pos=Number($('photoPosition').value)/100;
+  context.fillStyle='#ffffff';context.fillRect(0,0,640,400);context.drawImage(photoImage,(photoImage.width-w)*pos,(photoImage.height-h)*pos,w,h,0,0,640,400);
+  var quality=.86,data=canvas.toDataURL('image/jpeg',quality);while(data.length>65000&&quality>.25){quality-=.1;data=canvas.toDataURL('image/jpeg',quality)}
+  $('photoPreview').src=data;var raw=atob(data.split(',')[1]),bytes=new Uint8Array(raw.length);for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);photoBlob=new Blob([bytes],{type:'image/jpeg'});$('photoCrop').hidden=false;$('uploadPhoto').disabled=bytes.length>49152;if(bytes.length>49152)notice('Das Foto ist zu detailreich. Bitte einen ruhigeren Ausschnitt wählen.');
+}
+$('photoFile').onchange=action(async function(){var file=$('photoFile').files[0];if(!file)return;if(file.size>12*1024*1024)throw Error('Bitte ein Foto unter 12 MB auswählen');if(photoUrl)URL.revokeObjectURL(photoUrl);photoUrl=URL.createObjectURL(file);var image=new Image();await new Promise(function(resolve,reject){image.onload=resolve;image.onerror=function(){reject(Error('Dieses Bildformat kann das Tablet nicht öffnen'))};image.src=photoUrl});photoImage=image;$('photoPosition').value=50;cropPhoto()});
+$('photoPosition').oninput=cropPhoto;
+$('uploadPhoto').onclick=action(async function(){var id=Number($('recipeChoice').value);if(!id||!photoBlob)throw Error('Rezept und Foto auswählen');if(locked())return;mutation++;var response=await fetch('/api/photo/'+id,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'image/jpeg'},body:photoBlob});var data=await response.json();if(response.status===401)resetLogin();if(!response.ok)throw Error(data.error||'Foto konnte nicht gespeichert werden');await refreshRecipes(id);editRecipe();notice('Foto auf der Maschine gespeichert')});
+$('deletePhoto').onclick=action(async function(){var id=Number($('recipeChoice').value);if(!id||!confirm('Das Foto dieses Drinks entfernen?'))return;await api('photo/delete',{id:id});await refreshRecipes(id);editRecipe();notice('Foto entfernt')});
+async function poll(){
+  if(polling||$('app').hidden||requestBusy)return;polling=true;var epoch=mutation,job=ownerJob;
+  try{
+    var next=job?await api('heartbeat',{job:job}):await api('status');
+    if(epoch!==mutation||job!==ownerJob)return;
+    if(state.boot_id&&next.boot_id!==state.boot_id){ownerJob=0;lastCalibration=null;activeDrink='';notice('Die Maschine wurde neu gestartet. Der vorherige Auftrag wird nicht fortgesetzt.')}
+    if(ownerJob&&next.job===ownerJob&&!next.busy){
+      if(next.state==='done'){
+        if(lastCalibration&&lastCalibration.job===ownerJob){lastCalibration.done=true;$('calibration').hidden=false}
+        else if(activeKind==='drink'){$('finishTitle').textContent=activeDrink;$('finishText').textContent=next.manual_ml>.1?'Jetzt noch '+Math.round(next.manual_ml)+' ml '+(activeManual||'nach Rezept')+' von Hand auffüllen.':'Alle vorgesehenen Zutaten sind im Glas.';$('finish').hidden=false}
+        else notice('Lauf abgeschlossen');
+      }else{lastCalibration=null;$('calibration').hidden=true;notice(next.state==='aborted'?'Ausgabe gestoppt. Der angefangene Drink wird nicht fortgesetzt.':next.error||'Auftrag wurde unterbrochen.')}
+      ownerJob=0;
+    }
+    state=next;connected=true;show();
+  }catch(e){connected=false;notice(e.message);show()}finally{polling=false}
+}
+setInterval(poll,400);
+load().catch(function(e){resetLogin();notice(e.message==='Bitte anmelden'?'':e.message)});
 </script></body></html>

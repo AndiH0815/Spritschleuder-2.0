@@ -8,7 +8,7 @@ c++ -std=c++17 -Wall -Wextra -Werror -pedantic -fsanitize=undefined,address -fno
 ASAN_OPTIONS=detect_leaks=0 tests/build/controller
 : "${CJSON_SOURCE:?Set CJSON_SOURCE to the cJSON source directory (managed_components/espressif__cjson/cJSON)}"
 cc -c "$CJSON_SOURCE/cJSON.c" -o tests/build/cjson.o
-c++ -std=c++17 -Wall -Wextra -Werror -pedantic -Itests/fakes -I"$CJSON_SOURCE" tests/test_storage.cpp main/recipes.cpp main/pump_settings.cpp tests/build/cjson.o -o tests/build/storage
+c++ -std=c++17 -Wall -Wextra -Werror -pedantic -Itests/fakes -I"$CJSON_SOURCE" tests/test_storage.cpp main/recipes.cpp main/pump_settings.cpp main/bar_settings.cpp tests/build/cjson.o -o tests/build/storage
 tests/build/storage
 c++ -std=c++17 -Wall -Wextra -Werror -pedantic -Itests/fakes tests/test_access.cpp main/access_control.cpp -lcrypto -o tests/build/access
 tests/build/access

@@ -60,6 +60,13 @@ esp_err_t RecipeStore::init() {
             r.id = uint32_t(id->valuedouble);
             r.name = name->valuestring;
             r.manual_name = manual->valuestring;
+            auto photo = cJSON_GetObjectItemCaseSensitive(item, "photo");
+            if (cJSON_IsString(photo)) r.photo_key = photo->valuestring;
+            if (!r.photo_key.empty()) {
+                if (r.photo_key.size() != 16) valid = false;
+                for (char c : r.photo_key)
+                    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) valid = false;
+            }
             r.needs_review = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(item, "review"));
             cJSON *p = nullptr;
             cJSON_ArrayForEach(p, portions) {
@@ -141,6 +148,11 @@ esp_err_t RecipeStore::put(Recipe &r) {
     if (r.name.empty() || r.name.size() > 64 || r.manual_name.size() > 64 || !r.dosing.count ||
         r.dosing.count > 8)
         return ESP_ERR_INVALID_ARG;
+    if (!r.photo_key.empty()) {
+        if (r.photo_key.size() != 16) return ESP_ERR_INVALID_ARG;
+        for (char c : r.photo_key)
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return ESP_ERR_INVALID_ARG;
+    }
     double total = 0;
     for (size_t i = 0; i < r.dosing.count; ++i) {
         auto &p = r.dosing.portions[i];
@@ -202,6 +214,7 @@ esp_err_t RecipeStore::save() {
         cJSON_AddNumberToObject(v, "id", r.id);
         cJSON_AddStringToObject(v, "name", r.name.c_str());
         cJSON_AddStringToObject(v, "manual", r.manual_name.c_str());
+        cJSON_AddStringToObject(v, "photo", r.photo_key.c_str());
         cJSON_AddBoolToObject(v, "review", r.needs_review);
         auto ps = cJSON_AddArrayToObject(v, "portions");
         for (size_t i = 0; i < r.dosing.count; ++i) {

@@ -10,6 +10,10 @@
 #include "esp_random.h"
 #include "esp_timer.h"
 #include "pump_settings.h"
+#include "bar_settings.h"
+#include "photo_store.h"
+#include <cstdio>
+#include <cstdlib>
 #include "recipes.h"
 #include "wifi_manager.h"
 #include <cmath>
@@ -97,6 +101,7 @@ cJSON *status(WebSession *s) {
     cJSON_AddBoolToObject(o, "hardware_enabled", false);
 #endif
     cJSON_AddBoolToObject(o, "scale_enabled", false);
+    cJSON_AddBoolToObject(o, "photos_ready", PhotoStore::getInstance().ready());
     return o;
 }
 bool newRequest(cJSON *root, WebSession &s) {
@@ -112,6 +117,7 @@ cJSON *recipeJson(const Recipe &r) {
     cJSON_AddNumberToObject(o, "id", r.id);
     cJSON_AddStringToObject(o, "name", r.name.c_str());
     cJSON_AddStringToObject(o, "manual", r.manual_name.c_str());
+    cJSON_AddStringToObject(o, "photo", r.photo_key.c_str());
     cJSON_AddBoolToObject(o, "review", r.needs_review);
     auto parts = cJSON_AddArrayToObject(o, "portions");
     for (size_t j = 0; j < r.dosing.count; ++j) {
@@ -128,6 +134,100 @@ cJSON *recipeJson(const Recipe &r) {
                               sprit::calculate(r.dosing, PumpSettings::getInstance().all(), 400, 1,
                                                plan) == sprit::PlanError::None);
     return o;
+}
+
+cJSON *barJson() {
+    auto configuration = BarSettings::getInstance().all();
+    auto root = cJSON_CreateObject();
+    auto names = cJSON_AddArrayToObject(root, "ingredients");
+    for (auto &x : configuration.ingredients) {
+        auto item = cJSON_CreateObject(); cJSON_AddItemToArray(names, item);
+        cJSON_AddNumberToObject(item, "id", x.id);
+        cJSON_AddStringToObject(item, "name", x.name.c_str());
+    }
+    auto glasses = cJSON_AddArrayToObject(root, "glasses");
+    for (auto &g : configuration.glasses) {
+        auto item = cJSON_CreateObject(); cJSON_AddItemToArray(glasses, item);
+        cJSON_AddStringToObject(item, "name", g.name.c_str());
+        cJSON_AddNumberToObject(item, "ml", g.ml);
+    }
+    return root;
+}
+bool photoId(const std::string &input, uint32_t &id) {
+    const std::string uri = input.substr(0, input.find('?'));
+    const std::string prefix = "/api/photo/";
+    if (uri.compare(0, prefix.size(), prefix) || uri.size() <= prefix.size()) return false;
+    uint64_t value = 0;
+    for (size_t i = prefix.size(); i < uri.size(); ++i) {
+        char c = uri[i];
+        if (c < '0' || c > '9') return false;
+        value = value * 10 + (c - '0');
+        if (value > UINT32_MAX) return false;
+    }
+    id = uint32_t(value);
+    return id != 0;
+}
+esp_err_t photoGet(httpd_req_t *request, uint32_t id) {
+    Recipe recipe;
+    if (!PhotoStore::getInstance().ready() || !RecipeStore::getInstance().get(id, recipe) ||
+        !PhotoStore::validKey(recipe.photo_key))
+        return error(request, "Kein Foto vorhanden", "404 Not Found");
+    FILE *file = fopen(PhotoStore::path(recipe.photo_key).c_str(), "rb");
+    if (!file) return error(request, "Foto nicht lesbar", "404 Not Found");
+    httpd_resp_set_type(request, "image/jpeg");
+    httpd_resp_set_hdr(request, "Cache-Control", "private, no-store");
+    httpd_resp_set_hdr(request, "X-Content-Type-Options", "nosniff");
+    char buffer[1024]; size_t count;
+    esp_err_t e = ESP_OK;
+    while ((count = fread(buffer, 1, sizeof(buffer), file)) != 0) {
+        e = httpd_resp_send_chunk(request, buffer, count);
+        if (e != ESP_OK) break;
+    }
+    if (ferror(file)) e = ESP_FAIL;
+    fclose(file);
+    return e == ESP_OK ? httpd_resp_send_chunk(request, nullptr, 0) : e;
+}
+esp_err_t photoPut(httpd_req_t *request, uint32_t id) {
+    Recipe recipe;
+    auto &photos = PhotoStore::getInstance();
+    if (!photos.ready()) return error(request, "Bildspeicher nicht verfuegbar");
+    if (!RecipeStore::getInstance().get(id, recipe)) return error(request, "Rezept fehlt");
+    char type[32];
+    if (request->content_len < 4 || request->content_len > 49152 ||
+        httpd_req_get_hdr_value_str(request, "Content-Type", type, sizeof(type)) != ESP_OK ||
+        strcmp(type, "image/jpeg"))
+        return error(request, "JPEG bis 48 KiB erforderlich");
+    auto key = photos.freshKey();
+    if (key.empty()) return error(request, "Bildspeicher belegt");
+    FILE *file = fopen(PhotoStore::path(key).c_str(), "wb");
+    if (!file) return error(request, "Bildspeicher belegt");
+    char buffer[1024]; size_t got = 0;
+    unsigned char first[3] = {}, previous = 0, last = 0;
+    bool good = true;
+    while (got < request->content_len) {
+        size_t wanted = request->content_len - got;
+        if (wanted > sizeof(buffer)) wanted = sizeof(buffer);
+        int n = httpd_req_recv(request, buffer, wanted);
+        if (n <= 0) { good = false; break; }
+        for (int i = 0; i < n; ++i) {
+            if (got + size_t(i) < 3) first[got + i] = (unsigned char)buffer[i];
+            previous = last; last = (unsigned char)buffer[i];
+        }
+        if (fwrite(buffer, 1, n, file) != size_t(n)) { good = false; break; }
+        got += n;
+    }
+    if (fclose(file) != 0) good = false;
+    good = good && first[0] == 0xff && first[1] == 0xd8 && first[2] == 0xff &&
+           previous == 0xff && last == 0xd9;
+    if (!good) { photos.remove(key); return error(request, "Foto konnte nicht gespeichert werden"); }
+    auto old = recipe.photo_key; recipe.photo_key = key;
+    // Commit the new reference only after the entire image is closed. A failed
+    // NVS write retains the previous photo, even during replacement.
+    if (RecipeStore::getInstance().put(recipe) != ESP_OK) {
+        photos.remove(key); return error(request, "Rezept konnte nicht gespeichert werden");
+    }
+    photos.remove(old);
+    return reply(request, recipeJson(recipe));
 }
 } // namespace
 CocktailServer &CocktailServer::getInstance() {
@@ -213,6 +313,12 @@ esp_err_t CocktailServer::apiHandler(httpd_req_t *r) {
     if (!session)
         return error(r, "Bitte anmelden", "401 Unauthorized");
     if (r->method == HTTP_GET) {
+        if (uri == "/api/bar") return reply(r, barJson());
+        uint32_t photo_id;
+        if (photoId(uri, photo_id)) {
+            if (comm.busy()) return error(r, "Ausgabe aktiv", "409 Conflict");
+            return photoGet(r, photo_id);
+        }
         if (uri == "/api/status")
             return reply(r, status(session));
         if (uri == "/api/recipes") {
@@ -235,6 +341,13 @@ esp_err_t CocktailServer::apiHandler(httpd_req_t *r) {
             return reply(r, list);
         }
         return error(r, "Unbekannte Funktion", "404 Not Found");
+    }
+    uint32_t photo_id;
+    if (photoId(uri, photo_id)) {
+        if (session->admin_until <= esp_timer_get_time())
+            return error(r, "Verwaltungsfreigabe erforderlich", "403 Forbidden");
+        if (comm.busy()) return error(r, "Ausgabe aktiv", "409 Conflict");
+        return photoPut(r, photo_id);
     }
     auto root = body(r);
     if (!root)
@@ -293,6 +406,47 @@ esp_err_t CocktailServer::apiHandler(httpd_req_t *r) {
         return error(r, "Verwaltungsfreigabe erforderlich", "403 Forbidden");
     if (comm.busy())
         return error(r, "Aenderungen waehrend Ausgabe gesperrt", "409 Conflict");
+    if (uri == "/api/bar") {
+        auto names = field(root.get(), "ingredients"), glasses = field(root.get(), "glasses");
+        if (!cJSON_IsArray(names) || cJSON_GetArraySize(names) > 32 ||
+            !cJSON_IsArray(glasses) || cJSON_GetArraySize(glasses) != 2)
+            return error(r, "Zutaten und zwei Glasgroessen erforderlich");
+        BarConfiguration next;
+        cJSON *p = nullptr;
+        cJSON_ArrayForEach(p, names) {
+            double id;
+            if (!number(p, "id", id, 1, 255, true)) return error(r, "Zutatenkennung ungueltig");
+            next.ingredients.push_back({uint16_t(id), string(p, "name")});
+        }
+        for (int i = 0; i < 2; ++i) {
+            auto g = cJSON_GetArrayItem(glasses, i); double ml;
+            if (!number(g, "ml", ml, 20, 1000)) return error(r, "Glasmenge ungueltig");
+            next.glasses[i] = {string(g, "name"), ml};
+        }
+        // Referenced names cannot disappear accidentally. Renaming retains IDs.
+        for (const auto &old : BarSettings::getInstance().all().ingredients) {
+            bool exists = false;
+            for (const auto &x : next.ingredients) if (x.id == old.id) exists = true;
+            if (exists) continue;
+            for (const auto &pump : PumpSettings::getInstance().all())
+                if (pump.ingredient == old.id) return error(r, "Zutat noch einer Pumpe zugeordnet");
+            for (const auto &recipe : RecipeStore::getInstance().all())
+                for (size_t j = 0; j < recipe.dosing.count; ++j)
+                    if (recipe.dosing.portions[j].ingredient == old.id)
+                        return error(r, "Zutat noch in Rezept verwendet");
+        }
+        return BarSettings::getInstance().replace(next) == ESP_OK
+                   ? reply(r, barJson()) : error(r, "Zutaten oder Glasgroessen ungueltig");
+    }
+    if (uri == "/api/photo/delete") {
+        double id; Recipe recipe;
+        if (!number(root.get(), "id", id, 1, UINT32_MAX, true) ||
+            !RecipeStore::getInstance().get(uint32_t(id), recipe)) return error(r, "Rezept fehlt");
+        auto old = recipe.photo_key; recipe.photo_key.clear();
+        if (RecipeStore::getInstance().put(recipe) != ESP_OK) return error(r, "Speichern fehlgeschlagen");
+        PhotoStore::getInstance().remove(old);
+        return reply(r, recipeJson(recipe));
+    }
     if (uri == "/api/pumps") {
         auto list = field(root.get(), "pumps");
         if (!cJSON_IsArray(list) || cJSON_GetArraySize(list) != 8)
@@ -333,9 +487,12 @@ esp_err_t CocktailServer::apiHandler(httpd_req_t *r) {
         double id;
         if (!number(root.get(), "id", id, 1, UINT32_MAX, true))
             return error(r, "Rezeptkennung fehlt");
-        return RecipeStore::getInstance().remove(uint32_t(id)) == ESP_OK
-                   ? ok(r)
-                   : error(r, "Loeschen fehlgeschlagen");
+        Recipe recipe;
+        if (!RecipeStore::getInstance().get(uint32_t(id), recipe) ||
+            RecipeStore::getInstance().remove(uint32_t(id)) != ESP_OK)
+            return error(r, "Loeschen fehlgeschlagen");
+        PhotoStore::getInstance().remove(recipe.photo_key);
+        return ok(r);
     }
     if (uri == "/api/recipes") {
         Recipe recipe;
@@ -343,6 +500,10 @@ esp_err_t CocktailServer::apiHandler(httpd_req_t *r) {
         if (field(root.get(), "id") && !number(root.get(), "id", id, 0, UINT32_MAX, true))
             return error(r, "Rezeptkennung ungueltig");
         recipe.id = uint32_t(id);
+        if (recipe.id && !RecipeStore::getInstance().get(recipe.id, recipe))
+            return error(r, "Rezept nicht gefunden");
+        recipe.dosing.count = 0;
+        recipe.needs_review = false;
         recipe.name = string(root.get(), "name");
         recipe.manual_name = string(root.get(), "manual");
         auto parts = field(root.get(), "portions");

@@ -8,6 +8,7 @@
 struct Recipe {
     uint32_t id = 0;
     std::string name, manual_name = "Manuell auffuellen";
+    std::string photo_key;
     sprit::DosingRecipe dosing;
     bool needs_review = false;
 };
